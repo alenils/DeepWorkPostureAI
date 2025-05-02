@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Rule Type: Manual
+
+Defines how Cursor should behave as an assistant: task-by-task, no assumptions.
+
+
+# 🧠 workflow-preferences.md – AI Agent Behavior
+
+## Task Execution
+- Work only on one task at a time from TASKS.md
+- After completing a task, stop and ask for confirmation before continuing
+- If the PRD or task is unclear, ask for clarification
+
+## Session & Alert Behavior
+- Respect a 10-second slouch grace period before alerts
+- Alerts must not block or pause the timer
+- Respect user settings for nudge type (blink, sound, etc.)
+
+## Development Safety
+- Never touch `.env` or environment config files without explicit approval
+- Do not change unrelated code or global logic outside current task scope
+
+## Testing & Simulation
+- Use dummy posture data during development (before MediaPipe is integrated)
+- Clean up all test logic before merging or committing
+- Do not include mock/fake data in production mode
+
+@src/
+@TASKS.md
+
+@PRD.md
