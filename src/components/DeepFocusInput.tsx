@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 interface DeepFocusInputProps {
   isSessionActive: boolean;
   onGoalSet: (goal: string) => void;
-  onStartSession: () => void;
+  onStartSession: (goal: string) => void;
   className?: string;
 }
 
@@ -33,57 +33,59 @@ const PLACEHOLDER_TEXTS = [
 export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, className = '' }: DeepFocusInputProps) => {
   const [goal, setGoal] = useState('');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Rotate placeholder text every 5 seconds
   useEffect(() => {
-    if (isSessionActive) return;
+    if (isSessionActive || isFocused) return;
 
     const intervalId = setInterval(() => {
       setPlaceholderIndex(prev => (prev + 1) % PLACEHOLDER_TEXTS.length);
     }, 5000);
 
     return () => clearInterval(intervalId);
-  }, [isSessionActive]);
+  }, [isSessionActive, isFocused]);
 
   // Clear input when session starts
   useEffect(() => {
     if (isSessionActive) {
-      onGoalSet(goal.trim() || 'YOLO-MODE');
       setGoal('');
     }
-  }, [isSessionActive, goal, onGoalSet]);
+  }, [isSessionActive]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isSessionActive && goal.trim()) {
-      onStartSession();
+    if (e.key === 'Enter' && !isSessionActive) {
+      const finalGoal = goal.trim() || 'YOLO-MODE';
+      onStartSession(finalGoal);
+      onGoalSet(finalGoal);
     }
   };
 
+  const currentPlaceholder = isFocused && !goal 
+    ? "What's your focus goal?" 
+    : PLACEHOLDER_TEXTS[placeholderIndex];
+
   return (
-    <div className={`${className} flex-grow`}>
-      <label 
-        htmlFor="focusGoal" 
-        className="block text-sm font-medium text-gray-700 mb-2"
-      >
-        What's your focus goal?
-      </label>
+    <div className={`${className} w-full`}>
       <div className="relative">
         <input
           id="focusGoal"
           type="text"
-          placeholder={PLACEHOLDER_TEXTS[placeholderIndex]}
+          placeholder={currentPlaceholder}
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
           onKeyPress={handleKeyPress}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           disabled={isSessionActive}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+          className="w-full px-4 py-2 border rounded-lg 
+            focus:outline-none focus:ring-2 focus:ring-blue-500 
+            dark:bg-gray-700 dark:border-gray-600 dark:text-white 
+            dark:placeholder-gray-400 dark:focus:ring-blue-400
+            disabled:bg-gray-100 dark:disabled:bg-gray-800 
+            disabled:text-gray-500 dark:disabled:text-gray-400"
           maxLength={100}
         />
-        {isSessionActive && (
-          <div className="absolute right-3 top-2 text-sm text-gray-500">
-            Session in progress...
-          </div>
-        )}
       </div>
     </div>
   );

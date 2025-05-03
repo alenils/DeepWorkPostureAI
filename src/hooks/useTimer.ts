@@ -1,92 +1,101 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 type Timeout = ReturnType<typeof setTimeout>;
 
 interface UseTimerProps {
-  onTimerStart: () => void;
   onTimerEnd: () => void;
   onTimerTick: (remainingMs: number) => void;
+  onTimerStart: () => void; // Keep for signaling hook start
 }
 
-export const useTimer = ({ onTimerStart, onTimerEnd, onTimerTick }: UseTimerProps) => {
-  const [minutes, setMinutes] = useState<string>('25'); // Default 25 minutes
-  const [isInfinite, setIsInfinite] = useState(false);
+export const useTimer = ({ 
+  onTimerEnd, 
+  onTimerTick, 
+  onTimerStart 
+}: UseTimerProps) => {
   const [isRunning, setIsRunning] = useState(false);
-  const [remainingMs, setRemainingMs] = useState<number>(25 * 60 * 1000);
+  const [isPausedInternal, setIsPausedInternal] = useState(false); 
+  const [remainingMs, setRemainingMs] = useState<number>(0); // Initial value doesn't matter much now
+  const [sessionDurationMs, setSessionDurationMs] = useState<number>(0); // Store duration internally
+  const intervalRef = useRef<Timeout>();
+  const pausedTimeRef = useRef<number>(0);
+  const timerEndedRef = useRef<boolean>(false); 
 
   useEffect(() => {
-    let intervalId: Timeout;
-
-    if (isRunning) {
-      intervalId = setInterval(() => {
+    if (isRunning && !isPausedInternal) {
+      timerEndedRef.current = false; 
+      intervalRef.current = setInterval(() => {
         setRemainingMs((prev) => {
-          if (!isInfinite && prev <= 1000) {
-            clearInterval(intervalId);
-            setIsRunning(false);
-            onTimerEnd();
-            return 0;
+          const wasInfinite = sessionDurationMs === Number.MAX_SAFE_INTEGER;
+          if (!wasInfinite && prev <= 1000) {
+            if (!timerEndedRef.current) {
+              timerEndedRef.current = true;
+              clearInterval(intervalRef.current);
+              setIsRunning(false); // Set running false on natural end
+              onTimerEnd(); 
+            }
+            return 0; 
           }
           const newValue = prev - 1000;
           onTimerTick(newValue);
           return newValue;
         });
       }, 1000);
-
-      onTimerStart();
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [isRunning, isInfinite, onTimerStart, onTimerEnd, onTimerTick]);
-
-  const handleMinutesChange = (value: string) => {
-    if (value === '∞') {
-      setIsInfinite(true);
-      setMinutes('');
-      return;
-    }
-
-    setIsInfinite(false);
-    // Allow empty string for typing
-    if (value === '') {
-      setMinutes('');
-      return;
-    }
-
-    // Only allow positive integers
-    const num = parseInt(value);
-    if (!isNaN(num) && num > 0) {
-      setMinutes(num.toString());
-    }
-  };
-
-  const startTimer = () => {
-    if (!isInfinite && !minutes) return;
-    
-    if (!isInfinite) {
-      setRemainingMs(parseInt(minutes) * 60 * 1000);
     } else {
-      setRemainingMs(Number.MAX_SAFE_INTEGER);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning, isPausedInternal, sessionDurationMs, onTimerEnd, onTimerTick]);
+
+  const startTimer = (durationMs: number) => {
+    if (isRunning || durationMs <= 0) return;
     
-    setIsRunning(true);
+    setSessionDurationMs(durationMs); // Store the duration for this session
+    setRemainingMs(durationMs); 
+    setIsPausedInternal(false);
+    timerEndedRef.current = false; 
+    setIsRunning(true); 
+    onTimerStart();
   };
 
-  const formatTime = (ms: number): string => {
-    if (isInfinite) return '∞';
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const pauseTimer = () => {
+    if (!isRunning || isPausedInternal) return;
+    pausedTimeRef.current = remainingMs;
+    setIsPausedInternal(true);
+  };
+
+  const resumeTimer = () => {
+    if (!isRunning || !isPausedInternal) return;
+    setRemainingMs(pausedTimeRef.current);
+    setIsPausedInternal(false);
+  };
+
+  const stopTimer = () => {
+    if (!isRunning) return;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    setIsRunning(false);
+    setIsPausedInternal(false);
+    setRemainingMs(0);
+    setSessionDurationMs(0); // Reset internal duration
+    pausedTimeRef.current = 0;
+    timerEndedRef.current = true; 
   };
 
   return {
-    minutes,
-    isInfinite,
-    isRunning,
+    isRunning, 
+    isPausedInternal, 
     remainingMs,
-    handleMinutesChange,
     startTimer,
-    formatTime,
+    pauseTimer,
+    resumeTimer,
+    stopTimer,
   };
 }; 

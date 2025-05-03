@@ -50,6 +50,7 @@
   - AC 1: Add toggle button in navbar or footer
   - AC 2: Use Tailwind's 'dark:' variants for styling
   - AC 3: Persist dark/light preference in LocalStorage
+  - AC 4: Have a cyberpunk theme as well with colours and backround suited for that.  
 
 
 ## Could‑have Tasks
