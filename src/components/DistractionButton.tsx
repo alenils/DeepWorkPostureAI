@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSound } from '../hooks/useSound';
 
 interface DistractionButtonProps {
   isVisible: boolean;
@@ -28,8 +29,11 @@ export const DistractionButton = ({
   onDistraction, 
   distractionCount 
 }: DistractionButtonProps) => {
+  // Load and play distraction sound
+  const playDistractionSound = useSound('distraction.mp3');
 
   const handleButtonClick = () => {
+    playDistractionSound();
     onDistraction(); // Call directly
   };
 

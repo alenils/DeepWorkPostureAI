@@ -326,16 +326,16 @@ function App() {
       <div className="max-w-6xl mx-auto p-6">
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">DeepWorkPostureAI</h1>
         
-        {/* Main 3-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Notepad and Actions */}
-          <div className="space-y-6">
-            <Notepad />
+        {/* Main layout grid - updated column widths */}
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-[300px_minmax(620px,1fr)_300px]">
+          {/* Left Column: Actions (top) and Notepad (bottom) */}
+          <aside className="flex flex-col gap-6">
             <ActionsList />
-          </div>
+            <Notepad />
+          </aside>
           
           {/* Middle Column: Timer & Session History */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             {/* Focus Input and Timer Section */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
               <div className="flex flex-col md:flex-row items-start md:items-baseline space-y-4 md:space-y-0 md:space-x-4 mb-6">
@@ -442,10 +442,19 @@ function App() {
             </div>
           </div>
           
-          {/* Right Column: Quote and Camera */}
-          <div className="space-y-6">
-            <QuoteDisplay quote={currentQuote} />
-            <CameraPlaceholder />
+          {/* Right Column: Quote overlay and Camera */}
+          <div className="relative">
+            {/* Quote as an overlay */}
+            <div className="absolute top-0 right-0 max-w-[260px] z-10 p-3">
+              <p className="italic opacity-40 text-gray-600 dark:text-gray-400 text-sm text-right pointer-events-none">
+                {currentQuote}
+              </p>
+            </div>
+            
+            {/* Camera placeholder below */}
+            <div className="mt-10">
+              <CameraPlaceholder />
+            </div>
           </div>
         </div>
 
