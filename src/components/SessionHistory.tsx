@@ -29,11 +29,13 @@ type HistoryItem = SessionData | BreakData;
 interface SessionHistoryProps {
   history: HistoryItem[];
   onBreakNoteChange: (breakId: string, note: string) => void;
+  onBreakNoteSave: (breakId: string, note: string) => void;
 }
 
 export const SessionHistory = ({ 
   history,
-  onBreakNoteChange
+  onBreakNoteChange,
+  onBreakNoteSave
 }: SessionHistoryProps) => { 
   
   // Calculate total focus time from all sessions in history
@@ -87,6 +89,7 @@ export const SessionHistory = ({
                 breakEndTime={item.end}
                 note={item.note}
                 onNoteChange={(note) => onBreakNoteChange(item.id, note)}
+                onNoteSave={(note) => onBreakNoteSave(item.id, note)}
                 isActive={item.end === null}
               />
             );
