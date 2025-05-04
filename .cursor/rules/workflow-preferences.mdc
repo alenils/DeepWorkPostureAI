@@ -3,6 +3,12 @@ description:
 globs: 
 alwaysApply: false
 ---
+<!--
+@description  Enforces folder structure, Tailwind-only styling and file-size limits for DeepWorkPostureAI.
+@autoattach   chat
+-->
+
+
 Rule Type: Manual
 
 Defines how Cursor should behave as an assistant: task-by-task, no assumptions.

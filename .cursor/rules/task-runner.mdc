@@ -3,6 +3,10 @@ description:
 globs: 
 alwaysApply: false
 ---
+<!--
+@description  Enforces folder structure, Tailwind-only styling and file-size limits for DeepWorkPostureAI.
+@autoattach   chat
+-->
 # Task-runner rule (always loaded)
 
 **When** the agent starts a new action  
