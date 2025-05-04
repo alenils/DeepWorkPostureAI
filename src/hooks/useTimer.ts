@@ -32,7 +32,7 @@ export const useTimer = ({
               timerEndedRef.current = true;
               clearInterval(intervalRef.current);
               setIsRunning(false); // Set running false on natural end
-              onTimerEnd(); 
+              setTimeout(() => onTimerEnd(), 0); // Use setTimeout to ensure this runs after state updates
             }
             return 0; 
           }

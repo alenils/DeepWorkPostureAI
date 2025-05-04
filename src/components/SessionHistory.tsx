@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { BreakEntry } from './BreakEntry';
 
 interface SessionData {
   timestamp: number;
@@ -9,33 +10,50 @@ interface SessionData {
   distractions: number;
 }
 
-// Type for break notes (can be shared or imported)
+// Type for break notes
 type BreakNote = {
   [followingSessionTimestamp: number]: string;
+};
+
+// Type for break data
+interface BreakData {
+  startTime: number;
+  endTime?: number;
+  note: string;
+}
+
+// Map of breaks by timestamp
+type BreakMap = {
+  [followingSessionTimestamp: number]: BreakData;
 };
 
 // Update props
 interface SessionHistoryProps {
   sessions: SessionData[];
-  breakNotes: BreakNote; // Receive notes state
-  onNoteChange: (followingTimestamp: number, note: string) => void; // Receive handler
-  // onClearHistory prop removed as App manages all state now
+  breakNotes: BreakNote;
+  breaks: BreakMap;
+  activeBreakStartTime: number | null;
+  onNoteChange: (followingTimestamp: number, note: string) => void;
 }
 
-const MIN_BREAK_DURATION_MS = 60 * 1000; // Only show breaks longer than 1 minute
-
-// Accept new props, remove local state
-export const SessionHistory = ({ sessions, breakNotes, onNoteChange }: SessionHistoryProps) => { 
+// Accept new props, including break data
+export const SessionHistory = ({ 
+  sessions, 
+  breakNotes, 
+  breaks,
+  activeBreakStartTime,
+  onNoteChange 
+}: SessionHistoryProps) => { 
   
   // Sort sessions passed via props
   const sortedSessions = useMemo(() => 
     [...sessions].sort((a, b) => b.timestamp - a.timestamp), 
-  [sessions]); // Depend on the sessions prop
+  [sessions]);
 
   // Calculate total focus time from props
   const totalFocusTimeMs = useMemo(() => 
     sessions.reduce((sum, session) => sum + session.duration, 0),
-  [sessions]); // Depend on the sessions prop
+  [sessions]);
 
   // Format duration in M:SS
   const formatDuration = (ms: number): string => {
@@ -53,12 +71,6 @@ export const SessionHistory = ({ sessions, breakNotes, onNoteChange }: SessionHi
     if (hours > 0) result += `${hours}h `;
     if (minutes > 0 || hours === 0) result += `${minutes}m`;
     return result.trim() || '0m';
-  };
-
-  // Format break duration in minutes
-  const formatBreakDuration = (ms: number): string => {
-    const minutes = Math.round(ms / 60000);
-    return `${minutes} min break`;
   };
 
   if (sortedSessions.length === 0) {
@@ -84,58 +96,38 @@ export const SessionHistory = ({ sessions, breakNotes, onNoteChange }: SessionHi
 
       {/* Session List */}
       <div className="space-y-1">
+        {/* Active break entry - shown only if there's an active break */}
+        {activeBreakStartTime !== null && sortedSessions.length > 0 && (
+          <BreakEntry
+            key="active-break"
+            breakStartTime={activeBreakStartTime}
+            note={breakNotes[0] || ''}
+            onNoteChange={(note) => onNoteChange(0, note)}
+            isActive={true}
+          />
+        )}
+
         {sortedSessions.reduce((acc, session, index) => {
-          const previousSession = sortedSessions[index - 1]; // Session that happened *after* current chronologically
-          const nextSession = sortedSessions[index + 1]; // Session that happened *before* current chronologically
+          const sessionTimestamp = session.timestamp;
           
-          // Log current session index and timestamp for debugging
-          // console.log(`[History] Index: ${index}, Session Timestamp: ${session.timestamp}, Goal: ${session.goal}`);
-
-          // --- Add Break Row BEFORE Current Session (if applicable) ---
-          // Break occurs between the end of the *next* session (chronologically earlier) 
-          // and the start of the *current* session (chronologically later)
-          if (nextSession) { // Check if there IS a session chronologically earlier
-            const breakEndTime = session.timestamp; // Current session start time
-            const breakStartTime = nextSession.timestamp + nextSession.duration; // End time of the *previous* session
-            const breakDuration = breakEndTime - breakStartTime;
-            
-            // Uncomment logs for debugging
-            console.log(`[Break Check] Index: ${index}, Current Session: ${session.timestamp}, Prev Session Ended: ${breakStartTime}`);
-            console.log(`  -> Break Duration: ${breakDuration}ms (Min required: ${MIN_BREAK_DURATION_MS}ms)`);
-
-            if (breakDuration >= MIN_BREAK_DURATION_MS) {
-              const breakKey = `break-${session.timestamp}`;
-              const noteKey = session.timestamp; // Key note by the session *after* the break (current session)
-              
-              console.log(`    ==> ADDING Break Row`); // Log if condition met
-              acc.push(
-                // Use flex row for the break
-                <div key={breakKey} className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs flex items-center space-x-3">
-                  {/* Break duration */}
-                  <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">
-                    ~{formatBreakDuration(breakDuration)}
-                  </span>
-                  {/* Note input - takes remaining space */}
-                  <input
-                    type="text"
-                    placeholder="What did you do during the break?" 
-                    value={breakNotes[noteKey] || ''}
-                    onChange={(e) => onNoteChange(noteKey, e.target.value)}
-                    className="w-full flex-grow bg-transparent text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 text-xs focus:outline-none p-1 -m-1"
-                  />
-                </div>
-              );
-            } else {
-              console.log(`    ==> SKIPPING Break Row (Duration too short)`); // Log if skipped
-            }
-          }
+          // Add break entry before current session if it exists in our breaks data
+          if (breaks[sessionTimestamp]) {
+            const breakData = breaks[sessionTimestamp];
+            acc.push(
+              <BreakEntry
+                key={`break-${sessionTimestamp}`}
+                breakStartTime={breakData.startTime}
+                breakEndTime={breakData.endTime}
+                note={breakNotes[sessionTimestamp] || ''}
+                onNoteChange={(note) => onNoteChange(sessionTimestamp, note)}
+                isActive={false}
+              />
+            );
+          } 
           
-          // --- Add Current Session Row ---
+          // Add Current Session Row
           const isStreak = session.posture !== undefined && session.posture >= 80 && session.distractions <= 5;
           const sessionKey = `session-${session.timestamp}`;
-          
-          // Log the goal for the specific session being rendered
-          console.log(`[History Row] Rendering Index: ${index}, Goal: ${session.goal}, Timestamp: ${session.timestamp}`);
           
           acc.push(
             <div 

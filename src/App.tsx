@@ -21,6 +21,18 @@ type BreakNote = {
   [followingSessionTimestamp: number]: string;
 };
 
+// New type for break data
+interface BreakData {
+  startTime: number;
+  endTime?: number;
+  note: string;
+}
+
+// Map of breaks by the timestamp of the session that FOLLOWS the break
+type BreakMap = {
+  [followingSessionTimestamp: number]: BreakData;
+};
+
 function App() {
   // Lifted Timer Config State
   const [minutes, setMinutes] = useState<string>('25');
@@ -38,6 +50,8 @@ function App() {
   // History State
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [breakNotes, setBreakNotes] = useState<BreakNote>({});
+  const [breaks, setBreaks] = useState<BreakMap>({});
+  const [activeBreakStartTime, setActiveBreakStartTime] = useState<number | null>(null);
 
   // Summary State
   const [showSummary, setShowSummary] = useState(false);
@@ -49,7 +63,14 @@ function App() {
     setSessions(storedSessions);
     const storedNotes = JSON.parse(localStorage.getItem('breakNotes') || '{}');
     setBreakNotes(storedNotes);
+    const storedBreaks = JSON.parse(localStorage.getItem('breaks') || '{}');
+    setBreaks(storedBreaks);
   }, []);
+
+  // Save break data
+  useEffect(() => {
+    localStorage.setItem('breaks', JSON.stringify(breaks));
+  }, [breaks]);
 
   // Save break notes
   useEffect(() => {
@@ -96,6 +117,7 @@ function App() {
     setIsSessionActive(false); 
     setIsPaused(false);
     setRemainingTime(0); // Reset remaining time display explicitly
+    setCurrentGoal(''); // Reset the goal when a session ends
 
     // 3. Prepare and save session data
     const sessionData: SessionData = {
@@ -112,11 +134,15 @@ function App() {
     setSessions(updatedSessions);
     localStorage.setItem('sessions', JSON.stringify(updatedSessions));
     
-    // 5. Show summary
+    // 5. Start tracking active break
+    const breakStartTime = Date.now();
+    setActiveBreakStartTime(breakStartTime);
+    
+    // 6. Show summary
     setLastSession(sessionData);
     setShowSummary(true);
     
-    // 6. Reset per-session counters
+    // 7. Reset per-session counters
     setDistractionCount(0); 
 
   }, [isSessionActive, currentGoal, distractionCount, sessionStartTime, sessions, hookStopTimer]);
@@ -132,6 +158,31 @@ function App() {
      const finalGoal = currentGoal.trim() || 'YOLO-MODE';
      const durationMs = isInfinite ? Number.MAX_SAFE_INTEGER : durationMinutes * 60 * 1000;
      console.log(`[App] Starting Session: Goal='${finalGoal}', Duration=${durationMinutes}min (${durationMs}ms)`);
+     
+     // If we have an active break, end it and record it
+     if (activeBreakStartTime !== null) {
+       const currentTimestamp = Date.now();
+       const breakEndTime = currentTimestamp;
+       const updatedBreaks = { ...breaks };
+       
+       // Store the break data with the current session's timestamp as the key
+       updatedBreaks[currentTimestamp] = {
+         startTime: activeBreakStartTime,
+         endTime: breakEndTime,
+         note: breakNotes[0] || '' // Use temporary key 0 for active break note
+       };
+       
+       // Move the note from temporary key 0 to the actual timestamp key
+       const updatedNotes = { ...breakNotes };
+       if (updatedNotes[0]) {
+         updatedNotes[currentTimestamp] = updatedNotes[0];
+         delete updatedNotes[0]; // Remove the temporary note
+       }
+       
+       setBreaks(updatedBreaks);
+       setBreakNotes(updatedNotes);
+       setActiveBreakStartTime(null);
+     }
      
      setSessionDurationMs(durationMs);
      setCurrentGoal(finalGoal);
@@ -187,10 +238,25 @@ function App() {
 
   // Handler for updating break notes (passed down)
   const handleNoteChange = (followingTimestamp: number, note: string) => {
+    // Update note in breakNotes state
     setBreakNotes(prev => ({
       ...prev,
       [followingTimestamp]: note,
     }));
+    
+    // If we have this break in the breaks map, update its note too
+    setBreaks(prev => {
+      if (prev[followingTimestamp]) {
+        return {
+          ...prev,
+          [followingTimestamp]: {
+            ...prev[followingTimestamp],
+            note
+          }
+        };
+      }
+      return prev;
+    });
   };
 
   // Handler for clearing all history
@@ -198,8 +264,11 @@ function App() {
     if (window.confirm('Are you sure you want to clear all session history and break notes?')) {
       localStorage.removeItem('sessions');
       localStorage.removeItem('breakNotes');
+      localStorage.removeItem('breaks');
       setSessions([]);
       setBreakNotes({});
+      setBreaks({});
+      setActiveBreakStartTime(null);
     }
   };
 
@@ -293,7 +362,9 @@ function App() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700 relative">
           <SessionHistory 
             sessions={sessions} 
-            breakNotes={breakNotes} 
+            breakNotes={breakNotes}
+            breaks={breaks}
+            activeBreakStartTime={activeBreakStartTime}
             onNoteChange={handleNoteChange}
           /> 
 

@@ -34,6 +34,7 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
   const [goal, setGoal] = useState('');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
+  const [previousActiveState, setPreviousActiveState] = useState(isSessionActive);
 
   // Rotate placeholder text every 5 seconds
   useEffect(() => {
@@ -46,18 +47,34 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
     return () => clearInterval(intervalId);
   }, [isSessionActive, isFocused]);
 
-  // Clear input when session starts
+  // Reset input when session starts
   useEffect(() => {
     if (isSessionActive) {
       setGoal('');
     }
   }, [isSessionActive]);
 
+  // Reset goal input when session ends
+  useEffect(() => {
+    // If session was active and now it's not, it has ended
+    if (previousActiveState && !isSessionActive) {
+      setGoal('');
+    }
+    setPreviousActiveState(isSessionActive);
+  }, [isSessionActive, previousActiveState]);
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isSessionActive) {
       const finalGoal = goal.trim() || 'YOLO-MODE';
       onStartSession(finalGoal);
       onGoalSet(finalGoal);
+    }
+  };
+
+  const handleGoalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setGoal(e.target.value);
+    if (!isSessionActive) {
+      onGoalSet(e.target.value);
     }
   };
 
@@ -73,7 +90,7 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
           type="text"
           placeholder={currentPlaceholder}
           value={goal}
-          onChange={(e) => setGoal(e.target.value)}
+          onChange={handleGoalChange}
           onKeyPress={handleKeyPress}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
