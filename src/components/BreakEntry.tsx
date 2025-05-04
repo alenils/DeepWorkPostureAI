@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { msToClock } from '../utils/time';
 
 interface BreakEntryProps {
   breakStartTime: number; // When the previous session ended
-  breakEndTime?: number;  // Optional - if the break has ended (next session started)
+  breakEndTime: number | null;  // Now using null for open breaks
   note: string;
   onNoteChange: (note: string) => void;
   isActive: boolean;     // Whether this is the current active break
@@ -21,7 +22,7 @@ export const BreakEntry = ({
   useEffect(() => {
     if (!isActive) {
       // If break is no longer active and has an end time, calculate final duration
-      if (breakEndTime) {
+      if (breakEndTime !== null) {
         setElapsedTime(breakEndTime - breakStartTime);
       }
       return;
@@ -38,18 +39,11 @@ export const BreakEntry = ({
     return () => clearInterval(intervalId);
   }, [isActive, breakStartTime, breakEndTime]);
   
-  // Format duration as M:SS
-  const formatDuration = (ms: number): string => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-  
   return (
     <div className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs flex items-center space-x-3">
       {/* Break duration */}
       <span className="text-gray-500 dark:text-gray-400 flex-shrink-0 italic">
-        ⏱ {formatDuration(elapsedTime)} break
+        ⏱ {msToClock(elapsedTime)} break
       </span>
       {/* Note input - takes remaining space */}
       <input

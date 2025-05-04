@@ -7,8 +7,12 @@ import { DistractionButton } from './components/DistractionButton'
 import { DarkModeToggle } from './components/DarkModeToggle'
 import { TimerProgressBar } from './components/TimerProgressBar'
 import { useTimer } from './hooks/useTimer'
+import { msToClock } from './utils/time'
 
+// Unified history item types
 interface SessionData {
+  type: "session";
+  id: string;
   timestamp: number;
   duration: number;
   goal: string;
@@ -16,21 +20,20 @@ interface SessionData {
   distractions: number;
 }
 
-// Type for break notes state
-type BreakNote = {
-  [followingSessionTimestamp: number]: string;
-};
-
-// New type for break data
 interface BreakData {
-  startTime: number;
-  endTime?: number;
+  type: "break";
+  id: string;
+  start: number;
+  end: number | null;
+  durationMs: number;
   note: string;
 }
 
-// Map of breaks by the timestamp of the session that FOLLOWS the break
-type BreakMap = {
-  [followingSessionTimestamp: number]: BreakData;
+type HistoryItem = SessionData | BreakData;
+
+// Generate a simple UUID for item IDs
+const generateId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
 function App() {
@@ -47,11 +50,8 @@ function App() {
   const [isPaused, setIsPaused] = useState(false);
   const [sessionDurationMs, setSessionDurationMs] = useState<number>(0);
   
-  // History State
-  const [sessions, setSessions] = useState<SessionData[]>([]);
-  const [breakNotes, setBreakNotes] = useState<BreakNote>({});
-  const [breaks, setBreaks] = useState<BreakMap>({});
-  const [activeBreakStartTime, setActiveBreakStartTime] = useState<number | null>(null);
+  // History State - unified array of sessions and breaks
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Summary State
   const [showSummary, setShowSummary] = useState(false);
@@ -59,23 +59,14 @@ function App() {
 
   // Load initial data
   useEffect(() => {
-    const storedSessions = JSON.parse(localStorage.getItem('sessions') || '[]');
-    setSessions(storedSessions);
-    const storedNotes = JSON.parse(localStorage.getItem('breakNotes') || '{}');
-    setBreakNotes(storedNotes);
-    const storedBreaks = JSON.parse(localStorage.getItem('breaks') || '{}');
-    setBreaks(storedBreaks);
+    const storedHistory = JSON.parse(localStorage.getItem('history') || '[]');
+    setHistory(storedHistory);
   }, []);
 
-  // Save break data
+  // Save history data
   useEffect(() => {
-    localStorage.setItem('breaks', JSON.stringify(breaks));
-  }, [breaks]);
-
-  // Save break notes
-  useEffect(() => {
-    localStorage.setItem('breakNotes', JSON.stringify(breakNotes));
-  }, [breakNotes]);
+    localStorage.setItem('history', JSON.stringify(history));
+  }, [history]);
 
   // --- Timer Hook Setup --- 
   // Define callbacks FIRST
@@ -87,9 +78,6 @@ function App() {
       console.log('[App] useTimer internal process started');
   }, []);
 
-  // Define handleTimerEnd using useCallback (will need hook functions, define hook next)
-  // Placeholder: Define hook functions first, then come back to this.
-  
   // Use the timer hook
   const { 
     startTimer: hookStartTimer, 
@@ -119,24 +107,30 @@ function App() {
     setRemainingTime(0); // Reset remaining time display explicitly
     setCurrentGoal(''); // Reset the goal when a session ends
 
-    // 3. Prepare and save session data
+    // 3. Prepare finished session data
     const sessionData: SessionData = {
+      type: "session",
+      id: generateId(),
       timestamp: sessionStartTime,
-      duration: Date.now() - sessionStartTime, // Ensure duration is calculated correctly
+      duration: Date.now() - sessionStartTime,
       goal: currentGoal,
       distractions: distractionCount,
       posture: Math.round(Math.random() * 30 + 70)
     };
-    console.log('Session Data Created:', sessionData);
     
-    // 4. Update history state and localStorage
-    const updatedSessions = [...sessions, sessionData];
-    setSessions(updatedSessions);
-    localStorage.setItem('sessions', JSON.stringify(updatedSessions));
+    // 4. Create new break data that starts now
+    const breakData: BreakData = {
+      type: "break",
+      id: generateId(),
+      start: Date.now(),
+      end: null,
+      durationMs: 0,
+      note: ""
+    };
     
-    // 5. Start tracking active break
-    const breakStartTime = Date.now();
-    setActiveBreakStartTime(breakStartTime);
+    // 5. Update history with both the session and the break
+    const updatedHistory = [breakData, sessionData, ...history];
+    setHistory(updatedHistory);
     
     // 6. Show summary
     setLastSession(sessionData);
@@ -145,7 +139,7 @@ function App() {
     // 7. Reset per-session counters
     setDistractionCount(0); 
 
-  }, [isSessionActive, currentGoal, distractionCount, sessionStartTime, sessions, hookStopTimer]);
+  }, [isSessionActive, currentGoal, distractionCount, sessionStartTime, history, hookStopTimer]);
 
   // --- Central Session Start Logic ---
   const handleSessionStart = () => {
@@ -159,30 +153,19 @@ function App() {
      const durationMs = isInfinite ? Number.MAX_SAFE_INTEGER : durationMinutes * 60 * 1000;
      console.log(`[App] Starting Session: Goal='${finalGoal}', Duration=${durationMinutes}min (${durationMs}ms)`);
      
-     // If we have an active break, end it and record it
-     if (activeBreakStartTime !== null) {
-       const currentTimestamp = Date.now();
-       const breakEndTime = currentTimestamp;
-       const updatedBreaks = { ...breaks };
-       
-       // Store the break data with the current session's timestamp as the key
-       updatedBreaks[currentTimestamp] = {
-         startTime: activeBreakStartTime,
-         endTime: breakEndTime,
-         note: breakNotes[0] || '' // Use temporary key 0 for active break note
-       };
-       
-       // Move the note from temporary key 0 to the actual timestamp key
-       const updatedNotes = { ...breakNotes };
-       if (updatedNotes[0]) {
-         updatedNotes[currentTimestamp] = updatedNotes[0];
-         delete updatedNotes[0]; // Remove the temporary note
-       }
-       
-       setBreaks(updatedBreaks);
-       setBreakNotes(updatedNotes);
-       setActiveBreakStartTime(null);
+     // Close any open break
+     const updatedHistory = [...history];
+     const openBreak = updatedHistory.find(item => 
+       item.type === "break" && item.end === null
+     ) as BreakData | undefined;
+     
+     if (openBreak) {
+       const endTime = Date.now();
+       openBreak.end = endTime;
+       openBreak.durationMs = endTime - openBreak.start;
      }
+     
+     setHistory(updatedHistory);
      
      setSessionDurationMs(durationMs);
      setCurrentGoal(finalGoal);
@@ -236,49 +219,24 @@ function App() {
     }
   }
 
-  // Handler for updating break notes (passed down)
-  const handleNoteChange = (followingTimestamp: number, note: string) => {
-    // Update note in breakNotes state
-    setBreakNotes(prev => ({
-      ...prev,
-      [followingTimestamp]: note,
-    }));
-    
-    // If we have this break in the breaks map, update its note too
-    setBreaks(prev => {
-      if (prev[followingTimestamp]) {
-        return {
-          ...prev,
-          [followingTimestamp]: {
-            ...prev[followingTimestamp],
-            note
-          }
-        };
-      }
-      return prev;
-    });
+  // Handler for updating break notes
+  const handleBreakNoteChange = (breakId: string, note: string) => {
+    setHistory(prev => 
+      prev.map(item => 
+        item.type === "break" && item.id === breakId 
+          ? { ...item, note } 
+          : item
+      )
+    );
   };
 
   // Handler for clearing all history
   const handleClearHistory = () => {
     if (window.confirm('Are you sure you want to clear all session history and break notes?')) {
-      localStorage.removeItem('sessions');
-      localStorage.removeItem('breakNotes');
-      localStorage.removeItem('breaks');
-      setSessions([]);
-      setBreakNotes({});
-      setBreaks({});
-      setActiveBreakStartTime(null);
+      localStorage.removeItem('history');
+      setHistory([]);
     }
   };
-
-  // Use a consistent duration formatting function
-  const formatDuration = (ms: number): string => {
-    if (ms < 0) ms = 0; // Prevent negative display
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
@@ -338,7 +296,7 @@ function App() {
                 <div className="text-center">
                   <span className="text-blue-600 dark:text-blue-300 text-sm">Time Remaining</span>
                   <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                    {formatDuration(remainingTime)}
+                    {msToClock(remainingTime)}
                   </div>
                 </div>
                 <div className="text-center">
@@ -361,14 +319,11 @@ function App() {
         {/* Session History Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700 relative">
           <SessionHistory 
-            sessions={sessions} 
-            breakNotes={breakNotes}
-            breaks={breaks}
-            activeBreakStartTime={activeBreakStartTime}
-            onNoteChange={handleNoteChange}
+            history={history}
+            onBreakNoteChange={handleBreakNoteChange}
           /> 
 
-          {sessions.length > 0 && ( 
+          {history.length > 0 && ( 
              <div className="flex justify-center mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                <button
                  onClick={handleClearHistory}
