@@ -176,11 +176,7 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
     // Only create source node if it doesn't exist and audio element exists
     if (!sourceNodeRef.current && currentAudioRef.current && audioContextRef.current && analyserRef.current) {
       try {
-        // Disconnect any existing connections first
-        if (sourceNodeRef.current) {
-          sourceNodeRef.current.disconnect();
-        }
-        
+        // Create the source node
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
@@ -579,7 +575,9 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
           onClick={handlePlayPause}
           className={`w-12 h-12 flex items-center justify-center rounded-full cursor-pointer
             ${songs.length > 0 
-              ? 'bg-blue-500 text-white hover:bg-blue-600' 
+              ? (isPlaying 
+                ? 'bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700' 
+                : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700')
               : 'bg-gray-400 text-white cursor-not-allowed'} 
             transition-colors`}
           aria-label={isPlaying ? "Pause" : "Play"}

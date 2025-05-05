@@ -69,15 +69,9 @@ export const SessionHistory = ({
 
   return (
     <>
-      {/* Title and Total Time */}
+      {/* Title only - Total Focus removed to avoid duplication */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Session History</h2>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Total Focus: 
-          <span className="font-semibold text-gray-800 dark:text-gray-200 ml-1">
-            {formatTotalDuration(totalFocusTimeMs)}
-          </span>
-        </div>
       </div>
 
       {/* Render all history items in order - newest first */}

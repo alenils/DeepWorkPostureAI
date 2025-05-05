@@ -359,9 +359,7 @@ function App() {
       <DarkModeToggle />
       <div className="max-w-6xl mx-auto p-6">
         <header className="p-8 pb-2 flex justify-center">
-          <div className="container mx-auto">
-            <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white mx-auto">DEEP WORK: ULTIMATE DASHBOARD</h1>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">DEEP WORK: ULTIMATE DASHBOARD</h1>
         </header>
         
         {/* Main layout grid - updated column widths */}
@@ -461,19 +459,19 @@ function App() {
 
             {/* Session History Section */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700 relative">
-              {/* Timers Section */}
-              <div className="flex justify-between items-center mb-4">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">Total Focus:</span>
-                  <span className="ml-1 font-semibold text-gray-800 dark:text-gray-200">
+              {/* Totals Section - Redesigned to stack values and order by size */}
+              <div className="grid grid-cols-2 gap-3 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg mb-4">
+                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded shadow-sm">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Focus</div>
+                  <div className="text-xl font-bold text-gray-800 dark:text-gray-200">
                     {formatTotalDuration(totalFocusTimeMs)}
-                  </span>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">Total Break:</span>
-                  <span className="ml-1 font-semibold text-gray-800 dark:text-gray-200">
+                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded shadow-sm">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Break</div>
+                  <div className="text-xl font-bold text-gray-800 dark:text-gray-200">
                     {formatTotalDuration(totalBreakTimeMs)}
-                  </span>
+                  </div>
                 </div>
               </div>
               
