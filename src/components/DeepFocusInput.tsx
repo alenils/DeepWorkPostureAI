@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 interface DeepFocusInputProps {
   isSessionActive: boolean;
   onGoalSet: (goal: string) => void;
+  onDifficultySet?: (difficulty: 'easy' | 'medium' | 'hard') => void;
   onStartSession: (goal: string) => void;
   className?: string;
 }
@@ -30,11 +31,25 @@ const PLACEHOLDER_TEXTS = [
   "The task that survived 100 todo lists"
 ];
 
-export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, className = '' }: DeepFocusInputProps) => {
+export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, className = '', onDifficultySet }: DeepFocusInputProps) => {
   const [goal, setGoal] = useState('');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [previousActiveState, setPreviousActiveState] = useState(isSessionActive);
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+
+  // Store difficulty in localStorage
+  useEffect(() => {
+    localStorage.setItem('lastDifficulty', difficulty);
+  }, [difficulty]);
+
+  // Load difficulty from localStorage on init
+  useEffect(() => {
+    const savedDifficulty = localStorage.getItem('lastDifficulty') as 'easy' | 'medium' | 'hard' | null;
+    if (savedDifficulty) {
+      setDifficulty(savedDifficulty);
+    }
+  }, []);
 
   // Rotate placeholder text every 5 seconds
   useEffect(() => {
@@ -66,6 +81,7 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isSessionActive) {
       const finalGoal = goal.trim() || 'YOLO-MODE';
+      // Pass difficulty to start session handler
       onStartSession(finalGoal);
       onGoalSet(finalGoal);
     }
@@ -78,13 +94,20 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
     }
   };
 
+  const handleDifficultyChange = (newDifficulty: 'easy' | 'medium' | 'hard') => {
+    setDifficulty(newDifficulty);
+    if (onDifficultySet) {
+      onDifficultySet(newDifficulty);
+    }
+  };
+
   const currentPlaceholder = isFocused && !goal 
     ? "What's your focus goal?" 
     : PLACEHOLDER_TEXTS[placeholderIndex];
 
   return (
     <div className={`${className} w-full`}>
-      <div className="relative">
+      <div className="relative mb-2">
         <input
           id="focusGoal"
           type="text"
@@ -104,6 +127,39 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
           maxLength={100}
         />
       </div>
+      
+      {/* Difficulty selector */}
+      {!isSessionActive && (
+        <div className="flex gap-2 text-xs">
+          <button 
+            onClick={() => handleDifficultyChange('easy')} 
+            className={`flex-1 py-1 px-2 rounded-md font-medium transition-colors
+              ${difficulty === 'easy' 
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
+          >
+            🟢 Brain-Dead Task
+          </button>
+          <button 
+            onClick={() => handleDifficultyChange('medium')} 
+            className={`flex-1 py-1 px-2 rounded-md font-medium transition-colors
+              ${difficulty === 'medium' 
+                ? 'bg-yellow-500 text-white' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
+          >
+            🟡 Thinking
+          </button>
+          <button 
+            onClick={() => handleDifficultyChange('hard')} 
+            className={`flex-1 py-1 px-2 rounded-md font-medium transition-colors
+              ${difficulty === 'hard' 
+                ? 'bg-red-500 text-white' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
+          >
+            🔴 Deep Thinking
+          </button>
+        </div>
+      )}
     </div>
   );
 }; 

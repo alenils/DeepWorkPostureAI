@@ -12,6 +12,8 @@ interface SessionData {
   goal: string;
   posture?: number;
   distractions: number;
+  comment?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 interface BreakData {
@@ -100,22 +102,45 @@ export const SessionHistory = ({
                           session.posture >= 80 && 
                           session.distractions <= 5;
             
+            // Difficulty badge (��/🟡/🔴)
+            const difficultyBadge = {
+              easy: '🟢',
+              medium: '🟡',
+              hard: '🔴'
+            }[session.difficulty || 'medium'];
+            
             return (
               <div 
                 key={`session-${session.id}`} 
                 className={`rounded-lg p-3 text-sm flex items-center justify-between ${isStreak ? 'bg-green-100 dark:bg-green-900' : 'bg-gray-200 dark:bg-gray-800'}`}
               >
-                <div className="flex items-center space-x-4 overflow-hidden">
-                  <span title="Goal" className="truncate text-gray-800 dark:text-gray-200 font-medium">
-                    {session.goal}
-                  </span>
-                  <span title="Duration" className="text-gray-600 dark:text-gray-400 flex-shrink-0">
+                <div className="flex flex-col space-y-1 overflow-hidden flex-1">
+                  {/* First row: Goal and badges */}
+                  <div className="flex items-center space-x-2">
+                    <span title="Difficulty" className="flex-shrink-0">
+                      {difficultyBadge}
+                    </span>
+                    <span title="Goal" className="truncate text-gray-800 dark:text-gray-200 font-medium">
+                      {session.goal}
+                    </span>
+                  </div>
+                  
+                  {/* Second row: Comment if any */}
+                  {session.comment && (
+                    <div className="text-xs text-gray-600 dark:text-gray-400 italic truncate pl-6">
+                      "{session.comment}"
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-4 flex-shrink-0">
+                  <span title="Duration" className="text-gray-600 dark:text-gray-400">
                     ⏱️ {msToClock(session.duration)}
                   </span>
-                  <span title="Posture" className={`flex-shrink-0 ${session.posture !== undefined && session.posture >= 80 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                  <span title="Posture" className={`${session.posture !== undefined && session.posture >= 80 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
                     👤 {session.posture !== undefined ? `${session.posture}%` : 'N/A'}
                   </span>
-                  <span title="Distractions" className={`flex-shrink-0 ${session.distractions > 5 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
+                  <span title="Distractions" className={`${session.distractions > 5 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
                     ❌ {session.distractions}
                   </span>
                 </div>

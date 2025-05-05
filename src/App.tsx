@@ -10,10 +10,10 @@ import { useTimer } from './hooks/useTimer'
 import { msToClock, formatTotalDuration } from './utils/time'
 import { Notepad } from './components/Notepad'
 import { ActionsList } from './components/ActionsList'
-import { QuoteDisplay } from './components/QuoteDisplay'
 import { CameraPlaceholder } from './components/CameraPlaceholder'
 import { Toast } from './components/Toast'
 import { useSound } from './hooks/useSound'
+import { MusicPlayer } from './components/MusicPlayer'
 
 // Unified history item types
 interface SessionData {
@@ -24,6 +24,8 @@ interface SessionData {
   goal: string;
   posture?: number;
   distractions: number;
+  comment?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 interface BreakData {
@@ -42,25 +44,6 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-// Random quotes for display after sessions
-const QUOTES = [
-  "The best way to predict the future is to create it. - Abraham Lincoln",
-  "It's not that I'm so smart, it's just that I stay with problems longer. - Albert Einstein",
-  "Success is not final, failure is not fatal: It is the courage to continue that counts. - Winston Churchill",
-  "The secret of getting ahead is getting started. - Mark Twain",
-  "The harder you work for something, the greater you'll feel when you achieve it. - Anonymous",
-  "Don't watch the clock; do what it does. Keep going. - Sam Levenson",
-  "Quality is not an act, it is a habit. - Aristotle",
-  "The only way to do great work is to love what you do. - Steve Jobs",
-  "You don't have to be great to start, but you have to start to be great. - Zig Ziglar",
-  "Success is walking from failure to failure with no loss of enthusiasm. - Winston Churchill",
-  "The future depends on what you do today. - Mahatma Gandhi",
-  "The difference between ordinary and extraordinary is that little extra. - Jimmy Johnson",
-  "Discipline is the bridge between goals and accomplishment. - Jim Rohn",
-  "The only place where success comes before work is in the dictionary. - Vidal Sassoon",
-  "Small daily improvements are the key to staggering long-term results. - Anonymous"
-];
-
 function App() {
   // Sound effects
   const playStartSound = useSound('start.mp3');
@@ -75,6 +58,7 @@ function App() {
   // Core Session State
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [currentGoal, setCurrentGoal] = useState('');
+  const [currentDifficulty, setCurrentDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
   const [remainingTime, setRemainingTime] = useState<number>(0);
   const [distractionCount, setDistractionCount] = useState(0);
@@ -83,9 +67,6 @@ function App() {
   
   // History State - unified array of sessions and breaks
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  
-  // Quote state
-  const [currentQuote, setCurrentQuote] = useState('');
   
   // Toast state
   const [toast, setToast] = useState({ show: false, message: '' });
@@ -98,11 +79,6 @@ function App() {
   useEffect(() => {
     const storedHistory = JSON.parse(localStorage.getItem('history') || '[]');
     setHistory(storedHistory);
-    
-    // Set initial quote if none
-    if (!currentQuote) {
-      setCurrentQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
-    }
   }, []);
 
   // Save history data
@@ -180,7 +156,8 @@ function App() {
       duration: Date.now() - sessionStartTime,
       goal: currentGoal,
       distractions: distractionCount,
-      posture: Math.round(Math.random() * 30 + 70)
+      posture: Math.round(Math.random() * 30 + 70),
+      difficulty: currentDifficulty
     };
     
     // 4. Create new break data that starts now
@@ -197,17 +174,14 @@ function App() {
     const updatedHistory = [breakData, sessionData, ...history];
     setHistory(updatedHistory);
     
-    // 6. Show quote - select a new one
-    setCurrentQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
-    
-    // 7. Show summary
+    // 6. Show summary
     setLastSession(sessionData);
     setShowSummary(true);
     
-    // 8. Reset per-session counters
+    // 7. Reset per-session counters
     setDistractionCount(0); 
 
-  }, [isSessionActive, currentGoal, distractionCount, sessionStartTime, history, hookStopTimer, playDoneSound]);
+  }, [isSessionActive, currentGoal, distractionCount, sessionStartTime, history, hookStopTimer, playDoneSound, currentDifficulty]);
 
   // --- Central Session Start Logic ---
   const handleSessionStart = () => {
@@ -248,14 +222,12 @@ function App() {
      setIsSessionActive(true); 
 
      // Explicitly start the timer hook
-     hookStartTimer(durationMs); 
+     hookStartTimer(durationMs);
   };
 
   // --- Other Handlers ---
   const handleGoalSet = (goal: string) => {
-    if (!isSessionActive) {
-      setCurrentGoal(goal);
-    }
+    setCurrentGoal(goal);
   };
 
   const handleMinutesChange = (value: string) => {
@@ -320,6 +292,26 @@ function App() {
     }
   };
 
+  // Difficulty handler
+  const handleDifficultySet = (difficulty: 'easy' | 'medium' | 'hard') => {
+    setCurrentDifficulty(difficulty);
+  };
+
+  // Handle summary panel close with saved comment
+  const handleSummaryClose = () => {
+    if (lastSession && lastSession.comment) {
+      // Update the session in history with the comment
+      setHistory(prev => 
+        prev.map(item => 
+          item.type === "session" && item.id === lastSession.id
+            ? { ...item, comment: lastSession.comment }
+            : item
+        )
+      );
+    }
+    setShowSummary(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <DarkModeToggle />
@@ -344,6 +336,7 @@ function App() {
                   <DeepFocusInput 
                     isSessionActive={isSessionActive}
                     onGoalSet={handleGoalSet}
+                    onDifficultySet={handleDifficultySet}
                     onStartSession={handleSessionStart}
                   />
                 </div>
@@ -442,26 +435,22 @@ function App() {
             </div>
           </div>
           
-          {/* Right Column: Quote overlay and Camera */}
-          <div className="relative">
-            {/* Quote as an overlay */}
-            <div className="absolute top-0 right-0 max-w-[260px] z-10 p-3">
-              <p className="italic opacity-40 text-gray-600 dark:text-gray-400 text-sm text-right pointer-events-none">
-                {currentQuote}
-              </p>
-            </div>
-            
-            {/* Camera placeholder below */}
-            <div className="mt-10">
+          {/* Right Column: Camera and music player */}
+          <div className="flex flex-col gap-6">
+            {/* Camera placeholder */}
+            <div>
               <CameraPlaceholder />
             </div>
+           
+            {/* Music player */}
+            <MusicPlayer />
           </div>
         </div>
 
         {/* Session Summary Panel */}
         <SessionSummaryPanel 
           isVisible={showSummary}
-          onClose={() => setShowSummary(false)}
+          onClose={handleSummaryClose}
           sessionData={lastSession}
         />
         

@@ -11,17 +11,31 @@ interface SessionSummaryProps {
     goal: string;
     posture?: number;
     distractions: number;
+    comment?: string;
   } | null;
 }
 
 export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: SessionSummaryProps) => {
   const [quote, setQuote] = useState('');
+  const [comment, setComment] = useState('');
 
   useEffect(() => {
     if (isVisible) {
       setQuote(getRandomQuote());
+      setComment(sessionData?.comment || '');
     }
-  }, [isVisible]);
+  }, [isVisible, sessionData]);
+
+  const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setComment(e.target.value);
+  };
+
+  const handleCommentSave = () => {
+    if (sessionData) {
+      sessionData.comment = comment;
+    }
+    onClose();
+  };
 
   if (!isVisible || !sessionData) return null;
 
@@ -38,11 +52,8 @@ export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: Session
           <h2 className="text-xl font-semibold flex items-center">
             <span className="mr-2 text-yellow-500">💡</span> Session Summary
           </h2>
-          <button 
-            onClick={onClose}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors text-lg font-semibold"
-          >
-            Done
+          <button onClick={handleCommentSave} className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors text-lg font-semibold">
+            Save & Close
           </button>
         </div>
 
@@ -78,6 +89,22 @@ export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: Session
             <span className="mr-3 text-lg">❌</span>
             <span className="text-gray-500 dark:text-gray-400">Distractions: </span>
             <span className="ml-2 font-medium">{sessionData.distractions}</span>
+          </div>
+
+          {/* Comment Field */}
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <label htmlFor="session-comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              How did it go?
+            </label>
+            <input
+              id="session-comment"
+              type="text"
+              value={comment}
+              onChange={handleCommentChange}
+              maxLength={40}
+              placeholder="Brief comment on this session..."
+              className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
           </div>
         </div>
       </div>
