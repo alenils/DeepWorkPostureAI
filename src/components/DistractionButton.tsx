@@ -5,6 +5,7 @@ interface DistractionButtonProps {
   isVisible: boolean;
   onDistraction: () => void;
   distractionCount: number; // Receive count from App
+  className?: string; // Optional className prop
 }
 
 // Helper to generate tally marks
@@ -27,7 +28,8 @@ const TallyMarks = ({ count }: { count: number }) => {
 export const DistractionButton = ({ 
   isVisible, 
   onDistraction, 
-  distractionCount 
+  distractionCount,
+  className = '' // Default to empty string
 }: DistractionButtonProps) => {
   // Load and play distraction sound
   const playDistractionSound = useSound('distraction.mp3');
@@ -42,17 +44,12 @@ export const DistractionButton = ({
   return (
     <button
       onClick={handleButtonClick}
-      className="
+      className={`
         flex items-center
-        px-3 py-1.5 rounded-lg 
-        bg-red-100 dark:bg-red-900 
-        border border-red-300 dark:border-red-700
-        text-red-700 dark:text-red-200
-        text-sm font-medium
-        shadow-sm hover:shadow-md 
-        transition-all duration-150 ease-in-out
-        transform hover:scale-105 active:scale-95
-      "
+        px-3 py-1 rounded font-semibold transition
+        bg-red-600 hover:bg-red-700 text-white
+        ${className}
+      `}
       title="Log a distraction"
     >
       <span>DISTRACTED</span>

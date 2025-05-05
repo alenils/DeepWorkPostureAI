@@ -46,8 +46,8 @@ const generateId = () => {
 };
 
 // Star field animation constants
-const STAR_COUNT = 250; // Increased to 250 stars for warp full mode
-const STAR_COUNT_BG = 200; // 200 stars for background mode
+const STAR_COUNT = 400; // Increased to 400 stars for warp full mode
+const STAR_COUNT_BG = 350; // Increased to 350 stars for background mode
 const MAX_DEPTH = 300;
 
 // Warp mode types
@@ -89,6 +89,7 @@ function App() {
 
   // Warp state
   const [warpMode, setWarpMode] = useState<WarpMode>('none');
+  const [warpSpeed, setWarpSpeed] = useState(1.1);
   const warpCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const warpAnimationFrameIdRef = useRef<number | null>(null);
   const warpStarsRef = useRef<Array<{x: number, y: number, z: number}>>([]);
@@ -128,6 +129,14 @@ function App() {
       document.body.style.overflow = '';
       setShowExitButton(false);
       setShowDistractionInWarp(false);
+      
+      // Remove any UI fading classes
+      document.querySelectorAll('.warp-dimmed-text').forEach(el => {
+        el.classList.remove('opacity-70', 'warp-dimmed-text');
+      });
+      document.querySelectorAll('.warp-faded-button').forEach(el => {
+        el.classList.remove('opacity-30', 'warp-faded-button');
+      });
     }
     
     // Set up new warp mode
@@ -151,6 +160,13 @@ function App() {
         document.body.style.overflow = 'hidden';
         setShowExitButton(true);
         setShowDistractionInWarp(true);
+        
+        // Add fading to warp UI buttons
+        setTimeout(() => {
+          document.querySelectorAll('.warp-control-button').forEach(el => {
+            el.classList.add('opacity-30', 'warp-faded-button');
+          });
+        }, 100);
       } else {
         // Background warp
         canvas.style.position = 'fixed';
@@ -159,6 +175,15 @@ function App() {
         canvas.style.zIndex = '0';
         canvas.style.pointerEvents = 'none';
         canvas.style.opacity = '0.7';
+        
+        // Add fading to white numeric text
+        setTimeout(() => {
+          document.querySelectorAll('.text-white, .dark\\:text-white, .text-gray-200, .dark\\:text-gray-200').forEach(el => {
+            if (el.textContent && /[0-9]/.test(el.textContent)) {
+              el.classList.add('opacity-70', 'warp-dimmed-text');
+            }
+          });
+        }, 100);
       }
       
       document.body.appendChild(canvas);
@@ -168,13 +193,13 @@ function App() {
       initWarpStars(isFull ? STAR_COUNT : STAR_COUNT_BG);
       
       // Start animation
-      animateWarpStars(isFull ? 1.1 : 1.0);
+      animateWarpStars(warpSpeed);
     }
     
     // Update state and save to localStorage
     setWarpMode(mode);
     localStorage.setItem('warpMode', mode);
-  }, [warpMode, initWarpStars]);
+  }, [warpMode, initWarpStars, warpSpeed]);
 
   // Animate warp stars
   const animateWarpStars = useCallback((speedMultiplier = 1.0) => {
@@ -228,16 +253,34 @@ function App() {
     warpAnimationFrameIdRef.current = requestAnimationFrame(() => animateWarpStars(speedMultiplier));
   }, []);
   
-  // Load warp mode from localStorage on init
+  // Load warp settings from localStorage on init
   useEffect(() => {
     const savedMode = localStorage.getItem('warpMode') as WarpMode | null;
     if (savedMode && savedMode !== 'none') {
       // Don't auto-start, just remember the last used mode
       setWarpMode(savedMode);
     }
+    
+    const savedSpeed = localStorage.getItem('warpSpeed');
+    if (savedSpeed) {
+      setWarpSpeed(parseFloat(savedSpeed));
+    }
   }, []);
   
-  // Handle window resize for warp canvas
+  // Handle speed change
+  const handleWarpSpeedChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSpeed = parseFloat(e.target.value);
+    setWarpSpeed(newSpeed);
+    localStorage.setItem('warpSpeed', newSpeed.toString());
+    
+    // If warp is active, restart animation with new speed
+    if (warpMode !== 'none' && warpAnimationFrameIdRef.current) {
+      cancelAnimationFrame(warpAnimationFrameIdRef.current);
+      animateWarpStars(newSpeed);
+    }
+  }, [warpMode, animateWarpStars]);
+
+  // Update canvas size when window resizes
   useEffect(() => {
     const handleResize = () => {
       if (warpCanvasRef.current) {
@@ -654,6 +697,7 @@ function App() {
                         isVisible={isSessionActive && !isPaused}
                         onDistraction={handleDistraction}
                         distractionCount={distractionCount}
+                        className="warp-control-button"
                       />
                     </div>
                   </div>
@@ -746,17 +790,17 @@ function App() {
             {/* Immersion Mode Controls */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
               <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-3">Immersion Mode</h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-3">
                 <button
                   onClick={() => setWarpModeWithEffects('background')}
-                  className={`rounded bg-zinc-800 text-white hover:bg-blue-600 transition text-sm px-2 py-1 ${warpMode === 'background' ? 'ring-2 ring-blue-500' : ''}`}
+                  className={`rounded bg-zinc-800 text-white hover:bg-blue-600 transition text-sm px-2 py-1 ${warpMode === 'background' ? 'ring-2 ring-blue-500' : ''} warp-control-button`}
                   title="Stars visible behind dashboard"
                 >
                   ✨ Warp Background
                 </button>
                 <button
                   onClick={() => setWarpModeWithEffects('full')}
-                  className={`rounded bg-zinc-800 text-white hover:bg-blue-600 transition text-sm px-2 py-1 ${warpMode === 'full' ? 'ring-2 ring-blue-500' : ''}`}
+                  className={`rounded bg-zinc-800 text-white hover:bg-blue-600 transition text-sm px-2 py-1 ${warpMode === 'full' ? 'ring-2 ring-blue-500' : ''} warp-control-button`}
                   title="Full immersive starfield"
                 >
                   🌌 Warp Full
@@ -764,12 +808,31 @@ function App() {
                 {warpMode !== 'none' && (
                   <button
                     onClick={() => setWarpModeWithEffects('none')}
-                    className="rounded bg-red-700 text-white hover:bg-red-800 transition text-sm px-2 py-1"
+                    className="rounded bg-red-600 hover:bg-red-700 text-white transition text-sm px-2 py-1 warp-control-button"
                     title="Turn off warp effects"
                   >
                     ⏹️ Stop
                   </button>
                 )}
+              </div>
+              
+              {/* Speed throttle slider */}
+              <div className="mt-2">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Star Speed</label>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="5" 
+                  step="0.1" 
+                  value={warpSpeed}
+                  onChange={handleWarpSpeedChange}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                />
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <span>1×</span>
+                  <span>{warpSpeed.toFixed(1)}×</span>
+                  <span>5×</span>
+                </div>
               </div>
             </div>
           </div>
@@ -783,6 +846,26 @@ function App() {
           streakCount={totalStreakSessions}
           onStreakEnded={() => setTotalStreakSessions(0)}
         />
+        
+        {/* Warp Exit Button */}
+        {showExitButton && (
+          <button
+            onClick={() => setWarpModeWithEffects('none')}
+            className="fixed top-4 right-4 z-[10000] px-3 py-1 rounded font-semibold transition bg-red-600 hover:bg-red-700 text-white warp-control-button"
+          >
+            ❌ EXIT WARP
+          </button>
+        )}
+        
+        {/* Warp Distraction Button */}
+        {showDistractionInWarp && isSessionActive && !isPaused && (
+          <button
+            onClick={handleDistraction}
+            className="fixed top-4 left-4 z-[10000] px-3 py-1 rounded font-semibold transition bg-red-600 hover:bg-red-700 text-white warp-control-button"
+          >
+            ☄️ DISTRACTED
+          </button>
+        )}
         
         {/* Toast Notifications */}
         {toast.show && <Toast message={toast.message} />}
