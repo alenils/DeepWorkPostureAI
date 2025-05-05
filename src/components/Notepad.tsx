@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 export const Notepad = () => {
   const [note, setNote] = useState('');
   const saveTimeoutRef = useRef<number | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Load saved note from localStorage
   useEffect(() => {
@@ -11,6 +12,14 @@ export const Notepad = () => {
       setNote(savedNote);
     }
   }, []);
+  
+  // Auto-adjust textarea height based on content
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [note]);
   
   // Handle note changes with auto-save
   const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -42,13 +51,14 @@ export const Notepad = () => {
       </div>
       
       {/* Notepad texture and styling */}
-      <div className="bg-amber-50 dark:bg-gray-700 rounded shadow-inner p-4 bg-[url('/images/paper-texture.png')] bg-repeat">
+      <div className="bg-amber-50 dark:bg-gray-700 rounded shadow-inner p-4 bg-[url('/images/paper-texture.png')] bg-repeat overflow-visible max-h-[70vh] overflow-y-auto">
         <textarea
           value={note}
           onChange={handleNoteChange}
           onBlur={handleBlur}
+          ref={textareaRef}
           placeholder="Jot down your thoughts here..."
-          className="w-full h-64 bg-transparent resize-none outline-none text-gray-800 dark:text-gray-300 
+          className="w-full bg-transparent resize-none outline-none text-gray-800 dark:text-gray-300 
             border-0 placeholder-gray-400 dark:placeholder-gray-500 p-0 leading-relaxed
             bg-[linear-gradient(transparent,transparent_calc(1.5rem-1px),#ccc_calc(1.5rem),transparent_calc(1.5rem+1px))]
             bg-size-100%-1.5rem dark:bg-none

@@ -96,7 +96,7 @@ export const ActionsList = () => {
       </form>
       
       {/* Items list */}
-      <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+      <div className="space-y-2 overflow-visible max-h-[70vh] overflow-y-auto pr-2">
         {items.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400 text-center py-2">
             No tasks yet. Add one above!
