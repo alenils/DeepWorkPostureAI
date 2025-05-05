@@ -112,7 +112,11 @@ export const SessionHistory = ({
             return (
               <div 
                 key={`session-${session.id}`} 
-                className={`rounded-lg p-3 text-sm flex items-center justify-between ${isStreak ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-200 dark:bg-gray-800'}`}
+                className={`rounded-lg p-3 text-sm flex items-center justify-between ${
+                  isStreak 
+                    ? 'bg-green-100 dark:bg-green-900/30' 
+                    : 'bg-gray-200 dark:bg-gray-700/80'
+                }`}
               >
                 <div className="flex items-center space-x-2 flex-1 overflow-hidden">
                   {/* Goal and difficulty badge */}

@@ -358,9 +358,9 @@ function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <DarkModeToggle />
       <div className="max-w-6xl mx-auto p-6">
-        <header className="p-8 pb-2">
+        <header className="p-8 pb-2 flex justify-center">
           <div className="container mx-auto">
-            <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">DEEP WORK: ULTIMATE DASHBOARD</h1>
+            <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white mx-auto">DEEP WORK: ULTIMATE DASHBOARD</h1>
           </div>
         </header>
         
@@ -514,6 +514,8 @@ function App() {
           isVisible={showSummary}
           onClose={handleSummaryClose}
           sessionData={lastSession}
+          streakCount={totalStreakSessions}
+          onStreakEnded={() => setTotalStreakSessions(0)}
         />
         
         {/* Toast Notifications */}

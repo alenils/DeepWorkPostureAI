@@ -119,6 +119,7 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   // Initialize audio context and analyzer for equalizer
   useEffect(() => {
     if (!isEqEnabled || !currentAudioRef.current) {
+      // Clean up when EQ is disabled
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -128,6 +129,14 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
       if (sourceNodeRef.current) {
         sourceNodeRef.current.disconnect();
         sourceNodeRef.current = null;
+      }
+      
+      if (analyserRef.current) {
+        try {
+          analyserRef.current.disconnect();
+        } catch (e) {
+          // Ignore disconnect errors if already disconnected
+        }
       }
       
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
@@ -148,25 +157,42 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
     
     // Set up audio context and analyzer
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (e) {
+        console.error('Failed to create audio context:', e);
+        return;
+      }
     } else if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
+      audioContextRef.current.resume().catch(e => console.error('Failed to resume audio context:', e));
     }
     
-    if (!analyserRef.current) {
+    // Only create analyzer if it doesn't exist
+    if (!analyserRef.current && audioContextRef.current) {
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 256;
     }
     
-    if (!sourceNodeRef.current && currentAudioRef.current) {
-      sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
-      sourceNodeRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(audioContextRef.current.destination);
+    // Only create source node if it doesn't exist and audio element exists
+    if (!sourceNodeRef.current && currentAudioRef.current && audioContextRef.current && analyserRef.current) {
+      try {
+        // Disconnect any existing connections first
+        if (sourceNodeRef.current) {
+          sourceNodeRef.current.disconnect();
+        }
+        
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
+        sourceNodeRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+      } catch (e) {
+        console.error('Failed to setup audio nodes:', e);
+        return;
+      }
     }
     
     const analyser = analyserRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!analyser || !canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -205,6 +231,7 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
   }, [isEqEnabled]);

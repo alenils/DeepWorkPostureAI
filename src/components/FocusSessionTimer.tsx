@@ -212,6 +212,7 @@ export const FocusSessionTimer = ({
       <div className="flex space-x-2 mt-2 md:mt-0">
         {!isSessionActive && (
           <button
+            tabIndex={4}
             onClick={handleStart}
             disabled={!isInfinite && !minutes}
             className="w-28 h-10 rounded-full bg-[color:var(--accent-red)] text-white font-semibold hover:bg-red-700 transition-colors"

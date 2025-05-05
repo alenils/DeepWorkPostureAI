@@ -14,29 +14,58 @@ interface SessionSummaryProps {
     comment?: string;
     distractionLog?: string;
   } | null;
+  streakCount?: number;
+  onStreakEnded?: () => void;
 }
 
-export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: SessionSummaryProps) => {
+export const SessionSummaryPanel = ({ 
+  isVisible, 
+  onClose, 
+  sessionData, 
+  streakCount = 0, 
+  onStreakEnded 
+}: SessionSummaryProps) => {
   const [quote, setQuote] = useState('');
   const [comment, setComment] = useState('');
   const [distractionCount, setDistractionCount] = useState(0);
+  const [streakEnded, setStreakEnded] = useState(false);
 
   useEffect(() => {
     if (isVisible && sessionData) {
       setQuote(getRandomQuote());
       setComment(sessionData.comment || '');
       setDistractionCount(sessionData.distractions);
+      
+      // Check if this session ended the streak
+      if (sessionData.distractions >= 3 && streakCount > 0) {
+        setStreakEnded(true);
+        if (onStreakEnded) {
+          onStreakEnded();
+        }
+      } else {
+        setStreakEnded(false);
+      }
     }
-  }, [isVisible, sessionData]);
+  }, [isVisible, sessionData, streakCount, onStreakEnded]);
 
   const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setComment(e.target.value);
   };
 
   const handleAddDistraction = () => {
-    setDistractionCount(prev => prev + 1);
+    const newCount = distractionCount + 1;
+    setDistractionCount(newCount);
+    
+    // Check if adding this distraction will end the streak
+    if (newCount >= 3 && streakCount > 0 && !streakEnded) {
+      setStreakEnded(true);
+      if (onStreakEnded) {
+        onStreakEnded();
+      }
+    }
+    
     if (sessionData) {
-      sessionData.distractions = distractionCount + 1;
+      sessionData.distractions = newCount;
     }
   };
 
@@ -64,6 +93,13 @@ export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: Session
             <span className="mr-2 text-yellow-500">💡</span> Session Summary
           </h2>
         </div>
+
+        {/* Streak Ended Message */}
+        {streakEnded && (
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-md font-bold text-sm">
+            Oops, your streak ended! But remember: channel your inner Goggins and start the next session stronger.
+          </div>
+        )}
 
         {/* Inspirational Quote */}
         <p className="text-center text-gray-600 dark:text-gray-300 mb-6 italic text-sm">
