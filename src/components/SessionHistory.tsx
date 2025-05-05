@@ -14,6 +14,7 @@ interface SessionData {
   distractions: number;
   comment?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
+  distractionLog?: string;
 }
 
 interface BreakData {
@@ -98,11 +99,10 @@ export const SessionHistory = ({
           } else {
             // Render session item
             const session = item;
-            const isStreak = session.posture !== undefined && 
-                          session.posture >= 80 && 
-                          session.distractions <= 5;
+            // Update streak logic to only check for distractions <= 2
+            const isStreak = session.distractions <= 2;
             
-            // Difficulty badge (��/🟡/🔴)
+            // Difficulty badge (🟢/🟡/🔴)
             const difficultyBadge = {
               easy: '🟢',
               medium: '🟡',
@@ -112,42 +112,46 @@ export const SessionHistory = ({
             return (
               <div 
                 key={`session-${session.id}`} 
-                className={`rounded-lg p-3 text-sm flex items-center justify-between ${isStreak ? 'bg-green-100 dark:bg-green-900' : 'bg-gray-200 dark:bg-gray-800'}`}
+                className={`rounded-lg p-3 text-sm flex items-center justify-between ${isStreak ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-200 dark:bg-gray-800'}`}
               >
-                <div className="flex flex-col space-y-1 overflow-hidden flex-1">
-                  {/* First row: Goal and badges */}
-                  <div className="flex items-center space-x-2">
-                    <span title="Difficulty" className="flex-shrink-0">
-                      {difficultyBadge}
-                    </span>
-                    <span title="Goal" className="truncate text-gray-800 dark:text-gray-200 font-medium">
-                      {session.goal}
-                    </span>
-                  </div>
-                  
-                  {/* Second row: Comment if any */}
-                  {session.comment && (
-                    <div className="text-xs text-gray-600 dark:text-gray-400 italic truncate pl-6">
-                      "{session.comment}"
-                    </div>
-                  )}
+                <div className="flex items-center space-x-2 flex-1 overflow-hidden">
+                  {/* Goal and difficulty badge */}
+                  <span title={
+                    session.difficulty === 'easy' ? 'Brain-Dead Task' :
+                    session.difficulty === 'medium' ? 'High School Math' :
+                    'Deep Thinking'
+                  } className="flex-shrink-0">
+                    {difficultyBadge}
+                  </span>
+                  <span title="Goal" className="truncate text-gray-800 dark:text-gray-200 font-medium flex-1">
+                    {session.goal}
+                    {session.comment && (
+                      <span className="ml-2 text-xs italic text-gray-500 dark:text-gray-400 truncate max-w-[160px] inline-block">
+                        {session.comment}
+                      </span>
+                    )}
+                  </span>
                 </div>
 
-                <div className="flex items-center space-x-4 flex-shrink-0">
+                <div className="flex items-center space-x-3 flex-shrink-0">
                   <span title="Duration" className="text-gray-600 dark:text-gray-400">
                     ⏱️ {msToClock(session.duration)}
                   </span>
                   <span title="Posture" className={`${session.posture !== undefined && session.posture >= 80 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
                     👤 {session.posture !== undefined ? `${session.posture}%` : 'N/A'}
                   </span>
-                  <span title="Distractions" className={`${session.distractions > 5 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
+                  <span 
+                    title={session.distractionLog ? `Distractions: ${session.distractionLog}` : "Distractions"} 
+                    className={`${session.distractions > 2 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-green-600 dark:text-green-400'} flex items-center`}
+                  >
                     ❌ {session.distractions}
+                    {session.distractionLog && (
+                      <span className="ml-1 text-xs inline-block text-gray-500 dark:text-gray-400">
+                        📝
+                      </span>
+                    )}
                   </span>
                 </div>
-                
-                {isStreak && (
-                  <span className="text-xl flex-shrink-0" title="Streak!">🔥</span>
-                )}
               </div>
             );
           }

@@ -26,6 +26,7 @@ interface SessionData {
   distractions: number;
   comment?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
+  distractionLog?: string;
 }
 
 interface BreakData {
@@ -75,16 +76,30 @@ function App() {
   const [showSummary, setShowSummary] = useState(false);
   const [lastSession, setLastSession] = useState<SessionData | null>(null);
 
+  // Streak state
+  const [totalStreakSessions, setTotalStreakSessions] = useState(0);
+
   // Load initial data
   useEffect(() => {
     const storedHistory = JSON.parse(localStorage.getItem('history') || '[]');
     setHistory(storedHistory);
+    
+    // Load streak count from localStorage
+    const storedStreakCount = localStorage.getItem('totalStreakSessions');
+    if (storedStreakCount) {
+      setTotalStreakSessions(parseInt(storedStreakCount, 10));
+    }
   }, []);
 
   // Save history data
   useEffect(() => {
     localStorage.setItem('history', JSON.stringify(history));
   }, [history]);
+  
+  // Save streak count to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('totalStreakSessions', totalStreakSessions.toString());
+  }, [totalStreakSessions]);
   
   // Toast display handler
   const showToast = useCallback((message: string) => {
@@ -148,7 +163,12 @@ function App() {
     setRemainingTime(0); // Reset remaining time display explicitly
     setCurrentGoal(''); // Reset the goal when a session ends
 
-    // 3. Prepare finished session data
+    // 3. Check if this is a streak session (distractions <= 2) and increment streak count
+    if (distractionCount <= 2) {
+      setTotalStreakSessions(prev => prev + 1);
+    }
+
+    // 4. Prepare finished session data
     const sessionData: SessionData = {
       type: "session",
       id: generateId(),
@@ -157,10 +177,11 @@ function App() {
       goal: currentGoal,
       distractions: distractionCount,
       posture: Math.round(Math.random() * 30 + 70),
-      difficulty: currentDifficulty
+      difficulty: currentDifficulty,
+      distractionLog: ''
     };
     
-    // 4. Create new break data that starts now
+    // 5. Create new break data that starts now
     const breakData: BreakData = {
       type: "break",
       id: generateId(),
@@ -170,15 +191,15 @@ function App() {
       note: ""
     };
     
-    // 5. Update history with both the session and the break
+    // 6. Update history with both the session and the break
     const updatedHistory = [breakData, sessionData, ...history];
     setHistory(updatedHistory);
     
-    // 6. Show summary
+    // 7. Show summary
     setLastSession(sessionData);
     setShowSummary(true);
     
-    // 7. Reset per-session counters
+    // 8. Reset per-session counters
     setDistractionCount(0); 
 
   }, [isSessionActive, currentGoal, distractionCount, sessionStartTime, history, hookStopTimer, playDoneSound, currentDifficulty]);
@@ -288,7 +309,9 @@ function App() {
     if (window.confirm('Are you sure you want to clear all session history and break notes?')) {
       playCancelSound();
       localStorage.removeItem('history');
+      localStorage.removeItem('totalStreakSessions');
       setHistory([]);
+      setTotalStreakSessions(0);
     }
   };
 
@@ -299,18 +322,35 @@ function App() {
 
   // Handle summary panel close with saved comment
   const handleSummaryClose = () => {
-    if (lastSession && lastSession.comment) {
-      // Update the session in history with the comment
+    if (lastSession) {
+      // Update the session in history with the comment and distractions count
       setHistory(prev => 
         prev.map(item => 
           item.type === "session" && item.id === lastSession.id
-            ? { ...item, comment: lastSession.comment }
+            ? { 
+                ...item, 
+                comment: lastSession.comment,
+                distractions: lastSession.distractions
+              }
             : item
         )
       );
+      
+      // Show appropriate toast message
+      showToast("Session saved!");
+    } else {
+      showToast("Saved!");
     }
+    
+    // Close the summary panel
     setShowSummary(false);
   };
+
+  // Calculate glow intensity based on streak count
+  const getGlowClass = useCallback(() => {
+    if (totalStreakSessions < 1) return '';
+    return 'shadow-[0_0_0_2px_var(--tw-shadow-color),_0_0_10px_var(--tw-shadow-color)]';
+  }, [totalStreakSessions]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
@@ -319,7 +359,7 @@ function App() {
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">DeepWorkPostureAI</h1>
         
         {/* Main layout grid - updated column widths */}
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-[300px_minmax(620px,1fr)_300px]">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-[345px_minmax(575px,1fr)_300px]">
           {/* Left Column: Actions (top) and Notepad (bottom) */}
           <aside className="flex flex-col gap-6">
             <ActionsList />
@@ -329,7 +369,20 @@ function App() {
           {/* Middle Column: Timer & Session History */}
           <div className="space-y-6 min-w-0">
             {/* Focus Input and Timer Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <div className={`bg-white dark:bg-gray-800 rounded-lg p-6 relative
+              ${totalStreakSessions > 0 ? 
+                (isSessionActive 
+                  ? `shadow-[color:var(--accent-cyan)] dark:shadow-[color:var(--accent-cyan)] ${getGlowClass()}` 
+                  : `shadow-[color:var(--accent-green)] dark:shadow-[color:var(--accent-green)] ${getGlowClass()}`) 
+                : 'shadow-lg'}`}
+            >
+              {/* Streak badge */}
+              {totalStreakSessions > 0 && (
+                <div className="absolute -top-2 -right-2 bg-[color:var(--accent-green)] text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+                  🔥 x{totalStreakSessions}
+                </div>
+              )}
+              
               <div className="flex flex-col md:flex-row items-start md:items-baseline space-y-4 md:space-y-0 md:space-x-4 mb-6">
                 {/* Goal Input */} 
                 <div className="flex-grow w-full md:w-auto">
@@ -439,7 +492,7 @@ function App() {
           <div className="flex flex-col gap-6">
             {/* Camera placeholder */}
             <div>
-              <CameraPlaceholder />
+              <CameraPlaceholder isSessionActive={isSessionActive} />
             </div>
            
             {/* Music player */}

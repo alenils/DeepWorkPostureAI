@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --accent-green: #10b981;
+    --accent-cyan: #06b6d4;
+    --accent-blue: #3b82f6;
+    --accent-red: #ef4444;
+  }
+}
+
+@layer components {
+  .goalInput {
+    @apply text-[0.85rem] px-4 py-2 border rounded-lg 
+      focus:outline-none focus:ring-2 focus:ring-blue-500 
+      dark:bg-gray-700 dark:border-gray-600 dark:text-white 
+      dark:placeholder-gray-400 dark:focus:ring-blue-400
+      disabled:bg-gray-100 dark:disabled:bg-gray-800 
+      disabled:text-gray-500 dark:disabled:text-gray-400;
+  }
+}
+
 @layer utilities {
   /* Animation for toast notifications */
   .animate-fade-in-scale {

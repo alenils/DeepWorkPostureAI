@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface FocusSessionTimerProps {
   minutes: string;
@@ -79,6 +79,60 @@ export const FocusSessionTimer = ({
   const [isButtonAnimating, setIsButtonAnimating] = useState(false);
   const [pauseMessage, setPauseMessage] = useState(PAUSE_MESSAGES[0]);
   const [stopMessage, setStopMessage] = useState(STOP_MESSAGES[0]);
+  const [streakCount, setStreakCount] = useState(0);
+  const [streakRingProgress, setStreakRingProgress] = useState(0);
+
+  useEffect(() => {
+    const storedStreakCount = localStorage.getItem('totalStreakSessions');
+    if (storedStreakCount) {
+      const count = parseInt(storedStreakCount, 10);
+      setStreakCount(count);
+      setStreakRingProgress(Math.min(count * 10, 360));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'totalStreakSessions' && e.newValue) {
+        const count = parseInt(e.newValue, 10);
+        setStreakCount(count);
+        const newProgress = Math.min(count * 10, 360);
+        setStreakRingProgress(prevProgress => {
+          const step = (newProgress - prevProgress) / 30;
+          let current = prevProgress;
+          const animate = () => {
+            if (Math.abs(newProgress - current) < Math.abs(step)) {
+              setStreakRingProgress(newProgress);
+              return;
+            }
+            current += step;
+            setStreakRingProgress(current);
+            requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+          return prevProgress;
+        });
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    const intervalId = setInterval(() => {
+      const storedCount = localStorage.getItem('totalStreakSessions');
+      if (storedCount) {
+        const count = parseInt(storedCount, 10);
+        if (count !== streakCount) {
+          setStreakCount(count);
+          setStreakRingProgress(Math.min(count * 10, 360));
+        }
+      }
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(intervalId);
+    };
+  }, [streakCount]);
 
   const handleStart = () => {
     if (isSessionActive) return;
@@ -110,10 +164,26 @@ export const FocusSessionTimer = ({
     onTimerEnd();
   };
 
+  const calculateArcPath = (progress: number, radius: number = 40) => {
+    const angle = (progress * Math.PI) / 180;
+    
+    const startX = 50;
+    const startY = 50 - radius;
+    
+    const endX = 50 + radius * Math.sin(angle);
+    const endY = 50 - radius * Math.cos(angle);
+    
+    const largeArcFlag = progress > 180 ? 1 : 0;
+    
+    return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY}`;
+  };
+
   return (
-    <div className={`flex ${isCompact ? 'flex-row items-center space-x-4' : 'flex-col items-center space-y-4 p-4'}`}>
-      <div className="flex items-center space-x-2">
+    <div className={`flex ${isCompact ? 'flex-row items-center space-x-4' : 'flex-col items-center space-y-4 p-4'} relative`}>
+      <div className={`flex items-center space-x-2 ${isCompact ? '' : ''} z-10`}>
         <input
+          tabIndex={2}
+          id="minutesInput"
           type="text"
           value={isInfinite ? '∞' : minutes}
           onChange={(e) => onMinutesChange(e.target.value)}
@@ -123,37 +193,31 @@ export const FocusSessionTimer = ({
             }
           }}
           className={`
-            px-3 py-2 border rounded
+            goalInput
+            px-3 py-2 border rounded-lg
             focus:outline-none focus:ring-2 focus:ring-blue-500
             dark:bg-gray-700 dark:border-gray-600 dark:text-white
             dark:focus:ring-blue-400
+            text-[0.85rem]
             ${isCompact ? 'w-16' : 'w-20'}
             ${isSessionActive ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : ''}
           `}
           placeholder="25"
           disabled={isSessionActive}
+          title={`Streak sessions: ${streakCount}`}
         />
         <span className="text-gray-600 dark:text-gray-400">min</span>
       </div>
       
-      {/* Buttons Section */}
       <div className="flex space-x-2 mt-2 md:mt-0">
         {!isSessionActive && (
           <button
             onClick={handleStart}
             disabled={!isInfinite && !minutes}
-            className={`
-              px-6 py-2 rounded-lg font-semibold tracking-wide
-              transition-all duration-300 ease-in-out
-              ${isButtonAnimating
-                ? 'bg-green-500 text-white transform scale-105 dark:bg-green-600'
-                : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700'
-              }
-              ${isCompact ? 'text-sm py-2' : ''}
-              ${(!isInfinite && !minutes) ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
+            className="w-28 h-10 rounded-full bg-[color:var(--accent-red)] text-white font-semibold hover:bg-red-700 transition-colors"
+            title={`Streak sessions: ${streakCount}`}
           >
-            {startButtonText}
+            JUST DO IT
           </button>
         )}
 

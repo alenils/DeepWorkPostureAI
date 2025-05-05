@@ -80,10 +80,12 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isSessionActive) {
-      const finalGoal = goal.trim() || 'YOLO-MODE';
-      // Pass difficulty to start session handler
-      onStartSession(finalGoal);
-      onGoalSet(finalGoal);
+      e.preventDefault();
+      const finalGoal = goal.trim();
+      if (finalGoal !== '' && difficulty) {
+        onStartSession(finalGoal || 'YOLO-MODE');
+        onGoalSet(finalGoal || 'YOLO-MODE');
+      }
     }
   };
 
@@ -106,9 +108,10 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
     : PLACEHOLDER_TEXTS[placeholderIndex];
 
   return (
-    <div className={`${className} w-full`}>
+    <div className={`${className} w-[110%]`}>
       <div className="relative mb-2">
         <input
+          tabIndex={1}
           id="focusGoal"
           type="text"
           placeholder={currentPlaceholder}
@@ -118,12 +121,13 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           disabled={isSessionActive}
-          className="w-full px-4 py-2 border rounded-lg 
+          className="goalInput w-full px-4 py-2 border rounded-lg 
             focus:outline-none focus:ring-2 focus:ring-blue-500 
             dark:bg-gray-700 dark:border-gray-600 dark:text-white 
             dark:placeholder-gray-400 dark:focus:ring-blue-400
             disabled:bg-gray-100 dark:disabled:bg-gray-800 
-            disabled:text-gray-500 dark:disabled:text-gray-400"
+            disabled:text-gray-500 dark:disabled:text-gray-400
+            text-[0.85rem]"
           maxLength={100}
         />
       </div>
@@ -131,7 +135,7 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
       {/* Difficulty selector */}
       {!isSessionActive && (
         <div className="flex gap-2 text-xs">
-          <button 
+          <button tabIndex={3}
             onClick={() => handleDifficultyChange('easy')} 
             className={`flex-1 py-1 px-2 rounded-md font-medium transition-colors
               ${difficulty === 'easy' 
@@ -140,16 +144,16 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
           >
             🟢 Brain-Dead Task
           </button>
-          <button 
+          <button tabIndex={3}
             onClick={() => handleDifficultyChange('medium')} 
             className={`flex-1 py-1 px-2 rounded-md font-medium transition-colors
               ${difficulty === 'medium' 
                 ? 'bg-yellow-500 text-white' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
           >
-            🟡 Thinking
+            🟡 High School Math
           </button>
-          <button 
+          <button tabIndex={3}
             onClick={() => handleDifficultyChange('hard')} 
             className={`flex-1 py-1 px-2 rounded-md font-medium transition-colors
               ${difficulty === 'hard' 

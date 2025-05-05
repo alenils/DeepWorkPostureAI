@@ -12,17 +12,20 @@ interface SessionSummaryProps {
     posture?: number;
     distractions: number;
     comment?: string;
+    distractionLog?: string;
   } | null;
 }
 
 export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: SessionSummaryProps) => {
   const [quote, setQuote] = useState('');
   const [comment, setComment] = useState('');
+  const [distractionCount, setDistractionCount] = useState(0);
 
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && sessionData) {
       setQuote(getRandomQuote());
-      setComment(sessionData?.comment || '');
+      setComment(sessionData.comment || '');
+      setDistractionCount(sessionData.distractions);
     }
   }, [isVisible, sessionData]);
 
@@ -30,9 +33,17 @@ export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: Session
     setComment(e.target.value);
   };
 
-  const handleCommentSave = () => {
+  const handleAddDistraction = () => {
+    setDistractionCount(prev => prev + 1);
+    if (sessionData) {
+      sessionData.distractions = distractionCount + 1;
+    }
+  };
+
+  const handleSave = () => {
     if (sessionData) {
       sessionData.comment = comment;
+      sessionData.distractions = distractionCount;
     }
     onClose();
   };
@@ -48,13 +59,10 @@ export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: Session
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
       <div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4 transform transition-all duration-300 ease-in-out scale-95 animate-fade-in-scale">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-start items-center mb-4">
           <h2 className="text-xl font-semibold flex items-center">
             <span className="mr-2 text-yellow-500">💡</span> Session Summary
           </h2>
-          <button onClick={handleCommentSave} className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors text-lg font-semibold">
-            Save & Close
-          </button>
         </div>
 
         {/* Inspirational Quote */}
@@ -85,26 +93,51 @@ export const SessionSummaryPanel = ({ isVisible, onClose, sessionData }: Session
             </span>
           </div>
 
-          <div className="flex items-center">
-            <span className="mr-3 text-lg">❌</span>
-            <span className="text-gray-500 dark:text-gray-400">Distractions: </span>
-            <span className="ml-2 font-medium">{sessionData.distractions}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="mr-3 text-lg">❌</span>
+              <span className="text-gray-500 dark:text-gray-400">Distractions: </span>
+              <span className="ml-2 font-medium">{distractionCount}</span>
+            </div>
+            
+            {/* Distraction Button */}
+            <button
+              onClick={handleAddDistraction}
+              className="px-3 py-1 rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 
+                hover:bg-red-200 dark:hover:bg-red-800/40 font-medium transition flex items-center"
+            >
+              <span className="mr-2">❌</span>
+              <span>Add Distraction</span>
+            </button>
           </div>
 
           {/* Comment Field */}
-          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <label htmlFor="session-comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              How did it go?
-            </label>
-            <input
-              id="session-comment"
-              type="text"
-              value={comment}
-              onChange={handleCommentChange}
-              maxLength={40}
-              placeholder="Brief comment on this session..."
-              className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+            <div>
+              <label htmlFor="session-comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                How did it go?
+              </label>
+              <input
+                id="session-comment"
+                type="text"
+                value={comment}
+                onChange={handleCommentChange}
+                onKeyDown={(e) => { if (e.key === 'Enter') { handleSave(); e.preventDefault(); } }}
+                maxLength={40}
+                placeholder="Brief comment on this session..."
+                className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            
+            {/* Save Button */}
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors"
+              >
+                Save &amp; Close
+              </button>
+            </div>
           </div>
         </div>
       </div>

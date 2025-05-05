@@ -1,11 +1,46 @@
 import { useState, useEffect, useRef } from 'react';
 
-export const CameraPlaceholder = () => {
+// Focus statements for camera caption
+const FOCUS_STATEMENTS = [
+  "THIS IS WHAT FOCUS LOOKS LIKE",
+  "YOU ARE THE ONE DOING THE WORK",
+  "GRIT ON DISPLAY",
+  "EYES ON THE MISSION",
+  "DISTRACTION-FREE ZONE",
+  "GREATNESS THROUGH CONSISTENCY",
+  "DEEP WORK HAPPENING NOW",
+  "FLOW STATE ACTIVATED",
+  "STAY IN THE ZONE",
+  "FOCUS BUILDS FUTURES",
+  "MASTERY THROUGH CONCENTRATION",
+  "COMMITMENT VISIBLE",
+  "THIS IS YOUR MASTERPIECE",
+  "PROGRESS MADE VISIBLE",
+  "WATCH YOURSELF SUCCEED",
+  "MOMENTUM IN ACTION",
+  "SHOWING UP FOR YOURSELF",
+  "DISCIPLINE VISIBLE",
+  "POTENTIAL BECOMING REALITY",
+  "FUTURE SELF THANKS YOU"
+];
+
+export const CameraPlaceholder = ({ isSessionActive = false }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState('');
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const streamRef = useRef<MediaStream | null>(null);
+  const [currentCaption, setCurrentCaption] = useState('');
+  
+  // Set a random caption when session starts
+  useEffect(() => {
+    if (isSessionActive && cameraEnabled) {
+      const randomIndex = Math.floor(Math.random() * FOCUS_STATEMENTS.length);
+      setCurrentCaption(FOCUS_STATEMENTS[randomIndex]);
+    } else if (!isSessionActive) {
+      setCurrentCaption('');
+    }
+  }, [isSessionActive, cameraEnabled]);
   
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -102,9 +137,13 @@ export const CameraPlaceholder = () => {
               muted
               className="w-full h-full object-cover"
             />
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-              <p className="text-white text-sm font-medium">Posture Tracking Coming Soon...</p>
-            </div>
+            {currentCaption && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex justify-center">
+                <p className="text-white text-xs italic opacity-90 font-medium text-center">
+                  {currentCaption}
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
