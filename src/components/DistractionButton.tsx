@@ -46,8 +46,9 @@ export const DistractionButton = ({
       onClick={handleButtonClick}
       className={`
         flex items-center
-        px-3 py-1 rounded font-semibold transition
         bg-red-600 hover:bg-red-700 text-white
+        px-3 py-1 rounded font-semibold 
+        transition-opacity dark:opacity-90 dark:hover:opacity-100
         ${className}
       `}
       title="Log a distraction"

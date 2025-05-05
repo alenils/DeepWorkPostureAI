@@ -98,9 +98,9 @@ export const CameraPlaceholder = ({ isSessionActive = false }) => {
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">🎥 Posture Tracker</h2>
         <button
           onClick={toggleCamera}
-          className={`px-3 py-1 rounded font-semibold transition ${
+          className={`px-3 py-1 rounded font-semibold transition-opacity ${
             cameraEnabled 
-              ? 'bg-red-600 hover:bg-red-700 text-white' 
+              ? 'bg-red-600 hover:bg-red-700 text-white dark:opacity-90 dark:hover:opacity-100' 
               : 'bg-green-500 text-white hover:bg-green-600'
           }`}
         >

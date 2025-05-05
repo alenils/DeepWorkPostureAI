@@ -134,8 +134,8 @@ function App() {
       document.querySelectorAll('.warp-dimmed-text').forEach(el => {
         el.classList.remove('opacity-70', 'warp-dimmed-text');
       });
-      document.querySelectorAll('.warp-faded-button').forEach(el => {
-        el.classList.remove('opacity-30', 'warp-faded-button');
+      document.querySelectorAll('.warp-control-button').forEach(el => {
+        el.classList.remove('opacity-50', 'warp-faded-button');
       });
     }
     
@@ -164,7 +164,7 @@ function App() {
         // Add fading to warp UI buttons
         setTimeout(() => {
           document.querySelectorAll('.warp-control-button').forEach(el => {
-            el.classList.add('opacity-30', 'warp-faded-button');
+            el.classList.add('opacity-50');
           });
         }, 100);
       } else {
@@ -767,7 +767,7 @@ function App() {
                 <div className="flex justify-center mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
                     onClick={handleClearHistory}
-                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 font-medium py-1 px-3 rounded bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800/50 transition-colors"
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-semibold transition-opacity dark:opacity-90 dark:hover:opacity-100 text-xs"
                     title="Clear all history and notes"
                   >
                     Clear All History
@@ -805,15 +805,6 @@ function App() {
                 >
                   🌌 Warp Full
                 </button>
-                {warpMode !== 'none' && (
-                  <button
-                    onClick={() => setWarpModeWithEffects('none')}
-                    className="rounded bg-red-600 hover:bg-red-700 text-white transition text-sm px-2 py-1 warp-control-button"
-                    title="Turn off warp effects"
-                  >
-                    ⏹️ Stop
-                  </button>
-                )}
               </div>
               
               {/* Speed throttle slider */}
@@ -847,21 +838,23 @@ function App() {
           onStreakEnded={() => setTotalStreakSessions(0)}
         />
         
-        {/* Warp Exit Button */}
+        {/* Warp Exit Button - Only show in full warp mode */}
         {showExitButton && (
           <button
             onClick={() => setWarpModeWithEffects('none')}
-            className="fixed top-4 right-4 z-[10000] px-3 py-1 rounded font-semibold transition bg-red-600 hover:bg-red-700 text-white warp-control-button"
+            className="fixed top-4 right-4 z-[10000] bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-semibold transition-opacity dark:opacity-90 dark:hover:opacity-100 warp-control-button"
+            title="Exit warp mode"
           >
             ❌ EXIT WARP
           </button>
         )}
         
-        {/* Warp Distraction Button */}
+        {/* Warp Distraction Button - Only show in full warp mode */}
         {showDistractionInWarp && isSessionActive && !isPaused && (
           <button
             onClick={handleDistraction}
-            className="fixed top-4 left-4 z-[10000] px-3 py-1 rounded font-semibold transition bg-red-600 hover:bg-red-700 text-white warp-control-button"
+            className="fixed top-4 left-4 z-[10000] bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-semibold transition-opacity dark:opacity-90 dark:hover:opacity-100 warp-control-button"
+            title="Log a distraction"
           >
             ☄️ DISTRACTED
           </button>

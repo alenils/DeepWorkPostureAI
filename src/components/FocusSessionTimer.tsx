@@ -243,8 +243,9 @@ export const FocusSessionTimer = ({
             <button
               onClick={handleStop}
               className={`
-                px-3 py-1 rounded font-semibold transition
+                px-3 py-1 rounded font-semibold 
                 bg-red-600 hover:bg-red-700 text-white
+                transition-opacity dark:opacity-90 dark:hover:opacity-100
                 ${isCompact ? 'text-sm' : ''}
               `}
               title={stopMessage}

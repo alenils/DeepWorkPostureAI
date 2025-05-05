@@ -118,35 +118,45 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
 
   // Initialize audio context and analyzer for equalizer
   useEffect(() => {
-    if (!isEqEnabled || !currentAudioRef.current) {
-      // Clean up when EQ is disabled
+    // Always ensure audio context exists
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (e) {
+        console.error('Failed to create audio context:', e);
+        return;
+      }
+    } else if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(e => console.error('Failed to resume audio context:', e));
+    }
+
+    // When EQ is toggled OFF
+    if (!isEqEnabled) {
+      // Clean up visualizer
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
       
-      // Clean up previous analyzer
-      if (analyserRef.current && audioContextRef.current) {
+      // Properly clean up and reconnect
+      if (analyserRef.current && sourceNodeRef.current && audioContextRef.current) {
         try {
           analyserRef.current.disconnect();
+          
+          // Disconnect source and reconnect directly to destination for audio to continue
+          try { 
+            sourceNodeRef.current.disconnect(); 
+          } catch (e) {
+            // Ignore disconnect errors if already disconnected
+          }
+          
+          // Reconnect source directly to destination
+          sourceNodeRef.current.connect(audioContextRef.current.destination);
         } catch (e) {
-          // Ignore disconnect errors if already disconnected
+          console.error('Error during EQ disconnection:', e);
         }
+        
         analyserRef.current = null;
-      }
-      
-      if (sourceNodeRef.current) {
-        try {
-          sourceNodeRef.current.disconnect();
-        } catch (e) {
-          // Ignore disconnect errors
-        }
-        sourceNodeRef.current = null;
-      }
-      
-      // Don't close the audio context, just suspend it
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.suspend().catch(e => console.error('Failed to suspend audio context:', e));
       }
       
       // Clear canvas if it exists
@@ -161,30 +171,30 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
       return;
     }
     
-    // Set up audio context and analyzer
-    if (!audioContextRef.current) {
-      try {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      } catch (e) {
-        console.error('Failed to create audio context:', e);
-        return;
-      }
-    } else if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume().catch(e => console.error('Failed to resume audio context:', e));
-    }
+    // When EQ is toggled ON
     
-    // Only create analyzer if it doesn't exist
+    // Only set up the analyzer if we have audio context and it doesn't exist yet
     if (!analyserRef.current && audioContextRef.current) {
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 256;
     }
     
-    // Recreate source node only if needed
-    if (!sourceNodeRef.current && currentAudioRef.current && audioContextRef.current && analyserRef.current) {
+    // Set up connection chain if we have all needed components
+    if (currentAudioRef.current && audioContextRef.current && analyserRef.current) {
       try {
-        // Create the source node and connect the chain properly
-        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
-        // Connect nodes: source -> analyser -> destination
+        // Only create a new source node if one doesn't exist
+        if (!sourceNodeRef.current) {
+          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
+        } else {
+          // If source exists, disconnect it first to avoid duplicate connections
+          try { 
+            sourceNodeRef.current.disconnect(); 
+          } catch (e) {
+            // Ignore disconnect errors
+          }
+        }
+        
+        // Connect the audio pipeline: source -> analyser -> destination
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
       } catch (e) {
@@ -193,6 +203,7 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
       }
     }
     
+    // Start the visualizer for the EQ display
     const analyser = analyserRef.current;
     const canvas = canvasRef.current;
     if (!analyser || !canvas) return;
@@ -474,9 +485,9 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
     localStorage.setItem('flowLoop', newValue.toString());
   };
 
-  // Toggle equalizer
+  // Toggle equalizer with improved connection handling
   const toggleEqualizer = () => {
-    setIsEqEnabled(!isEqEnabled);
+    setIsEqEnabled(prev => !prev);
   };
 
   // Toggle playInSession mode
