@@ -1,23 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
+import { msToClock } from '../utils/time';
 
 export const MusicPlayer = () => {
   const currentAudioRef = useRef<HTMLAudioElement>(null);
   const nextAudioRef = useRef<HTMLAudioElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
   const [songs, setSongs] = useState<string[]>([]);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [nextSongIndex, setNextSongIndex] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [songName, setSongName] = useState('');
   const [isCrossFading, setIsCrossFading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const fadeIntervalRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   
-  // Fetch song list using Vite's import.meta.glob
+  // Load songs using import.meta.glob
   useEffect(() => {
     try {
-      // Using dynamic import with Vite glob pattern
       const songModules = import.meta.glob('/public/sounds/song*.mp3', { eager: true });
-      
-      // Process the returned object into an array of paths
       const songPaths = Object.keys(songModules)
         .map(path => path.replace('/public', ''))
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
@@ -30,7 +32,7 @@ export const MusicPlayer = () => {
     }
   }, []);
 
-  // Initialize next song index when songs are loaded
+  // Initialize next song index and load last played song from localStorage
   useEffect(() => {
     if (songs.length > 0) {
       const savedIndex = localStorage.getItem('lastSongIndex');
@@ -57,6 +59,27 @@ export const MusicPlayer = () => {
     }
   }, [currentSongIndex, songs]);
 
+  // Update current time for progress bar
+  useEffect(() => {
+    if (!isPlaying || !currentAudioRef.current) return;
+    
+    const updateTime = () => {
+      if (currentAudioRef.current) {
+        setCurrentTime(currentAudioRef.current.currentTime);
+        setDuration(currentAudioRef.current.duration || 0);
+        animationFrameRef.current = requestAnimationFrame(updateTime);
+      }
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(updateTime);
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isPlaying]);
+
   // Start cross-fade when current song is near end
   useEffect(() => {
     if (!isPlaying || songs.length <= 1 || !currentAudioRef.current || !nextAudioRef.current) return;
@@ -68,13 +91,14 @@ export const MusicPlayer = () => {
       if (!currentAudio || isCrossFading) return;
       
       // Start cross-fade 5 seconds before the end
-      if (currentAudio.duration && currentAudio.currentTime > currentAudio.duration - 5) {
+      const fadeTime = 5; // seconds
+      if (currentAudio.duration && currentAudio.currentTime > currentAudio.duration - fadeTime) {
         startCrossFade();
       }
     };
     
     // Set up interval to check time
-    const timeCheckInterval = setInterval(checkTime, 1000);
+    const timeCheckInterval = setInterval(checkTime, 500);
     
     return () => {
       clearInterval(timeCheckInterval);
@@ -88,21 +112,22 @@ export const MusicPlayer = () => {
     setIsCrossFading(true);
     const currentAudio = currentAudioRef.current;
     const nextAudio = nextAudioRef.current;
+    const fadeTime = 5; // seconds
     
     // Make sure next audio is ready
     nextAudio.volume = 0;
     nextAudio.play().catch(console.error);
     
     // Cross-fade over 5 seconds
-    let step = 0;
-    const steps = 50; // 50 steps over 5 seconds = 1 step every 100ms
+    let startTime = Date.now();
     const fadeInterval = window.setInterval(() => {
-      step++;
-      if (step <= steps) {
+      const elapsed = (Date.now() - startTime) / 1000; // seconds
+      
+      if (elapsed <= fadeTime) {
         // Decrease current audio volume
-        currentAudio.volume = Math.max(0, 1 - (step / steps));
+        currentAudio.volume = Math.max(0, 1 - (elapsed / fadeTime));
         // Increase next audio volume
-        nextAudio.volume = Math.min(1, step / steps);
+        nextAudio.volume = Math.min(1, elapsed / fadeTime);
       } else {
         // Fade complete
         currentAudio.pause();
@@ -119,7 +144,7 @@ export const MusicPlayer = () => {
         clearInterval(fadeInterval);
         fadeIntervalRef.current = null;
       }
-    }, 100);
+    }, 50);
     
     fadeIntervalRef.current = fadeInterval;
   };
@@ -148,8 +173,19 @@ export const MusicPlayer = () => {
         fadeIntervalRef.current = null;
         setIsCrossFading(false);
       }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     }
   }, [isPlaying, currentSongIndex, songs]);
+
+  // Handle audio ended event (if cross-fade somehow fails)
+  const handleAudioEnded = () => {
+    if (!isCrossFading && songs.length > 1) {
+      setCurrentSongIndex(nextSongIndex);
+      setNextSongIndex((nextSongIndex + 1) % songs.length);
+    }
+  };
 
   const handlePlayPause = () => {
     if (songs.length === 0) return;
@@ -182,10 +218,10 @@ export const MusicPlayer = () => {
     setNextSongIndex((nextSongIndex + 1) % songs.length);
     setIsCrossFading(false);
     
-    // Always restart with new track, regardless of play state
-    if (currentAudioRef.current) {
+    // Always restart with new track
+    if (isPlaying && currentAudioRef.current) {
       setTimeout(() => {
-        if (currentAudioRef.current && isPlaying) {
+        if (currentAudioRef.current) {
           currentAudioRef.current.play().catch(console.error);
         }
       }, 50);
@@ -221,23 +257,55 @@ export const MusicPlayer = () => {
     setNextSongIndex(currentSongIndex);
     setIsCrossFading(false);
     
-    // Always restart with new track, regardless of play state
-    if (currentAudioRef.current) {
+    // Always restart with new track
+    if (isPlaying && currentAudioRef.current) {
       setTimeout(() => {
-        if (currentAudioRef.current && isPlaying) {
+        if (currentAudioRef.current) {
           currentAudioRef.current.play().catch(console.error);
         }
       }, 50);
     }
   };
 
+  // Handle progress bar click
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!currentAudioRef.current || !progressRef.current) return;
+    
+    const rect = progressRef.current.getBoundingClientRect();
+    const clickPosition = (e.clientX - rect.left) / rect.width;
+    const newTime = clickPosition * currentAudioRef.current.duration;
+    
+    currentAudioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mt-6">
       <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">🎵 Music</h2>
 
-      {/* Song Name */}
-      <div className="text-center mb-3 truncate text-gray-700 dark:text-gray-300">
-        {songs.length > 0 ? songName : "No songs found"}
+      {/* Song Name and Time */}
+      <div className="mb-3">
+        <div className="text-center truncate text-gray-700 dark:text-gray-300 mb-1">
+          {songs.length > 0 ? songName : "No songs found"}
+        </div>
+        
+        {/* Time display */}
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+          <span>{msToClock(currentTime * 1000)}</span>
+          <span>{msToClock(duration * 1000)}</span>
+        </div>
+        
+        {/* Progress bar */}
+        <div 
+          ref={progressRef}
+          className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full mt-1 mb-3 cursor-pointer overflow-hidden"
+          onClick={handleProgressClick}
+        >
+          <div 
+            className="h-full bg-blue-500 dark:bg-blue-600 rounded-full transition-all duration-100"
+            style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+          />
+        </div>
       </div>
 
       {/* Controls */}
@@ -287,6 +355,12 @@ export const MusicPlayer = () => {
             ref={currentAudioRef}
             src={songs[currentSongIndex]}
             preload="auto"
+            onEnded={handleAudioEnded}
+            onLoadedMetadata={() => {
+              if (currentAudioRef.current) {
+                setDuration(currentAudioRef.current.duration);
+              }
+            }}
           />
           {songs.length > 1 && (
             <audio

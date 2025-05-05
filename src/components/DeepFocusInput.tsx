@@ -108,7 +108,7 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
     : PLACEHOLDER_TEXTS[placeholderIndex];
 
   return (
-    <div className={`${className} w-[calc(110%-40px)]`}>
+    <div className={`${className}`}>
       <div className="relative mb-2">
         <input
           tabIndex={1}
@@ -121,7 +121,7 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           disabled={isSessionActive}
-          className="goalInput w-full px-4 py-2 border rounded-lg 
+          className="goalInput w-full flex-grow min-w-0 max-w-[500px] px-4 py-2 border rounded-lg 
             focus:outline-none focus:ring-2 focus:ring-blue-500 
             dark:bg-gray-700 dark:border-gray-600 dark:text-white 
             dark:placeholder-gray-400 dark:focus:ring-blue-400

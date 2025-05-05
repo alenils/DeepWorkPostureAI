@@ -78,13 +78,13 @@ export const ActionsList = () => {
       <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">✅ Today's Actions</h2>
       
       {/* Add new item form */}
-      <form onSubmit={handleAddItem} className="mb-4 flex items-center">
+      <form onSubmit={handleAddItem} className="mb-4 flex items-center gap-2">
         <input
           type="text"
           value={newItemText}
           onChange={e => setNewItemText(e.target.value)}
           placeholder="Add a new task..."
-          className="flex-grow min-w-0 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 
+          className="flex-grow min-w-0 max-w-[calc(100%-96px)] p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 
             dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
         <button 
