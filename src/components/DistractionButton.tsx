@@ -53,9 +53,9 @@ export const DistractionButton = ({
         transition-all duration-150 ease-in-out
         transform hover:scale-105 active:scale-95
       "
-      title="Log a moment of weakness"
+      title="Log a distraction"
     >
-      <span>I HAD A WEAK MOMENT</span>
+      <span>DISTRACTED</span>
       <TallyMarks count={distractionCount} />
     </button>
   );

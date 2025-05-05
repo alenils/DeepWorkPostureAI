@@ -182,10 +182,10 @@ export const MusicPlayer = () => {
     setNextSongIndex((nextSongIndex + 1) % songs.length);
     setIsCrossFading(false);
     
-    // If we were playing, restart with new track
-    if (isPlaying && currentAudioRef.current) {
+    // Always restart with new track, regardless of play state
+    if (currentAudioRef.current) {
       setTimeout(() => {
-        if (currentAudioRef.current) {
+        if (currentAudioRef.current && isPlaying) {
           currentAudioRef.current.play().catch(console.error);
         }
       }, 50);
@@ -221,10 +221,10 @@ export const MusicPlayer = () => {
     setNextSongIndex(currentSongIndex);
     setIsCrossFading(false);
     
-    // If we were playing, restart with new track
-    if (isPlaying && currentAudioRef.current) {
+    // Always restart with new track, regardless of play state
+    if (currentAudioRef.current) {
       setTimeout(() => {
-        if (currentAudioRef.current) {
+        if (currentAudioRef.current && isPlaying) {
           currentAudioRef.current.play().catch(console.error);
         }
       }, 50);
@@ -244,7 +244,7 @@ export const MusicPlayer = () => {
       <div className="flex justify-center space-x-4">
         <button 
           onClick={handlePrevious}
-          className={`w-10 h-10 flex items-center justify-center rounded-full 
+          className={`w-10 h-10 flex items-center justify-center rounded-full cursor-pointer
             ${songs.length > 1 
               ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' 
               : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'} 
@@ -256,7 +256,7 @@ export const MusicPlayer = () => {
         </button>
         <button 
           onClick={handlePlayPause}
-          className={`w-12 h-12 flex items-center justify-center rounded-full 
+          className={`w-12 h-12 flex items-center justify-center rounded-full cursor-pointer
             ${songs.length > 0 
               ? 'bg-blue-500 text-white hover:bg-blue-600' 
               : 'bg-gray-400 text-white cursor-not-allowed'} 
@@ -268,7 +268,7 @@ export const MusicPlayer = () => {
         </button>
         <button 
           onClick={handleNext}
-          className={`w-10 h-10 flex items-center justify-center rounded-full 
+          className={`w-10 h-10 flex items-center justify-center rounded-full cursor-pointer
             ${songs.length > 1 
               ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' 
               : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'} 

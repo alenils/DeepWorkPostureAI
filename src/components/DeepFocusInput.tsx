@@ -108,7 +108,7 @@ export const DeepFocusInput = ({ isSessionActive, onGoalSet, onStartSession, cla
     : PLACEHOLDER_TEXTS[placeholderIndex];
 
   return (
-    <div className={`${className} w-[110%]`}>
+    <div className={`${className} w-[calc(110%-40px)]`}>
       <div className="relative mb-2">
         <input
           tabIndex={1}

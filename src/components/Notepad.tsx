@@ -65,8 +65,9 @@ export const Notepad = () => {
           placeholder="Jot down your thoughts here..."
           className="w-full bg-transparent resize-none outline-none text-gray-800 dark:text-gray-300 
             border-0 placeholder-gray-400 dark:placeholder-gray-500 p-0 leading-relaxed
-            bg-[linear-gradient(transparent,transparent_calc(1.5rem-1px),#ccc_calc(1.5rem),transparent_calc(1.5rem+1px))]
-            bg-size-100%-1.5rem dark:bg-none
+            bg-[linear-gradient(transparent,transparent_calc(1.5rem-1px),rgba(0,0,0,0.06)_calc(1.5rem),transparent_calc(1.5rem+1px))]
+            dark:bg-[linear-gradient(transparent,transparent_calc(1.5rem-1px),rgba(255,255,255,0.06)_calc(1.5rem),transparent_calc(1.5rem+1px))]
+            bg-size-100%-1.5rem
             [background-position:0_1.5rem] text-base"
           style={{ 
             lineHeight: '1.5rem',

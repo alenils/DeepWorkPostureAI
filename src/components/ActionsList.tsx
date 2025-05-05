@@ -84,12 +84,12 @@ export const ActionsList = () => {
           value={newItemText}
           onChange={e => setNewItemText(e.target.value)}
           placeholder="Add a new task..."
-          className="flex-grow p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 
+          className="flex-grow min-w-0 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 
             dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
         <button 
           type="submit"
-          className="bg-blue-500 text-white p-2 rounded-r font-medium hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+          className="w-16 bg-blue-500 text-white p-2 rounded-r font-medium hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
         >
           Add
         </button>

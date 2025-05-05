@@ -123,7 +123,7 @@ export const SessionHistory = ({
                   } className="flex-shrink-0">
                     {difficultyBadge}
                   </span>
-                  <span title="Goal" className="truncate text-gray-800 dark:text-gray-200 font-medium flex-1">
+                  <span title="Goal" className="truncate text-gray-800 dark:text-gray-200 font-medium flex-1 flex items-center">
                     {session.goal}
                     {session.comment && (
                       <span className="ml-2 text-xs italic text-gray-500 dark:text-gray-400 truncate max-w-[160px] inline-block">

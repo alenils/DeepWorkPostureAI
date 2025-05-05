@@ -180,7 +180,7 @@ export const FocusSessionTimer = ({
 
   return (
     <div className={`flex ${isCompact ? 'flex-row items-center space-x-4' : 'flex-col items-center space-y-4 p-4'} relative`}>
-      <div className={`flex items-center space-x-2 ${isCompact ? '' : ''} z-10`}>
+      <div className={`flex items-center gap-2 ${isCompact ? '' : ''} z-10`}>
         <input
           tabIndex={2}
           id="minutesInput"
@@ -199,7 +199,7 @@ export const FocusSessionTimer = ({
             dark:bg-gray-700 dark:border-gray-600 dark:text-white
             dark:focus:ring-blue-400
             text-[0.85rem]
-            ${isCompact ? 'w-16' : 'w-20'}
+            ${isCompact ? 'w-[80%]' : 'w-[80%]'}
             ${isSessionActive ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : ''}
           `}
           placeholder="25"
