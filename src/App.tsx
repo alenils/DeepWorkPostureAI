@@ -45,6 +45,14 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
+// Star field animation constants
+const STAR_COUNT = 250; // Increased to 250 stars for warp full mode
+const STAR_COUNT_BG = 200; // 200 stars for background mode
+const MAX_DEPTH = 300;
+
+// Warp mode types
+type WarpMode = 'none' | 'background' | 'full';
+
 function App() {
   // Sound effects
   const playStartSound = useSound('start.mp3');
@@ -79,6 +87,190 @@ function App() {
   // Streak state
   const [totalStreakSessions, setTotalStreakSessions] = useState(0);
 
+  // Warp state
+  const [warpMode, setWarpMode] = useState<WarpMode>('none');
+  const warpCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const warpAnimationFrameIdRef = useRef<number | null>(null);
+  const warpStarsRef = useRef<Array<{x: number, y: number, z: number}>>([]);
+  const [showExitButton, setShowExitButton] = useState(false);
+  const [showDistractionInWarp, setShowDistractionInWarp] = useState(false);
+  
+  // Initialize warp stars
+  const initWarpStars = useCallback((count: number) => {
+    const stars = [];
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * window.innerWidth * 2 - window.innerWidth,
+        y: Math.random() * window.innerHeight * 2 - window.innerHeight,
+        z: Math.random() * MAX_DEPTH
+      });
+    }
+    warpStarsRef.current = stars;
+  }, []);
+
+  // Set warp mode
+  const setWarpModeWithEffects = useCallback((mode: WarpMode) => {
+    // Clean up existing warp if active
+    if (warpMode !== 'none') {
+      // Cancel animation
+      if (warpAnimationFrameIdRef.current) {
+        cancelAnimationFrame(warpAnimationFrameIdRef.current);
+        warpAnimationFrameIdRef.current = null;
+      }
+      
+      // Remove canvas
+      if (warpCanvasRef.current) {
+        document.body.removeChild(warpCanvasRef.current);
+        warpCanvasRef.current = null;
+      }
+      
+      document.body.classList.remove('bg-black');
+      document.body.style.overflow = '';
+      setShowExitButton(false);
+      setShowDistractionInWarp(false);
+    }
+    
+    // Set up new warp mode
+    if (mode !== 'none') {
+      const isFull = mode === 'full';
+      
+      // Create canvas with appropriate z-index and styling
+      const canvas = document.createElement('canvas');
+      canvas.id = isFull ? 'warpfull' : 'warpbg';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      
+      if (isFull) {
+        // Full warp
+        document.body.classList.add('bg-black');
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.zIndex = '9999';
+        canvas.style.opacity = '1';
+        document.body.style.overflow = 'hidden';
+        setShowExitButton(true);
+        setShowDistractionInWarp(true);
+      } else {
+        // Background warp
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.zIndex = '0';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.opacity = '0.7';
+      }
+      
+      document.body.appendChild(canvas);
+      warpCanvasRef.current = canvas;
+      
+      // Initialize stars (more stars for full warp)
+      initWarpStars(isFull ? STAR_COUNT : STAR_COUNT_BG);
+      
+      // Start animation
+      animateWarpStars(isFull ? 1.1 : 1.0);
+    }
+    
+    // Update state and save to localStorage
+    setWarpMode(mode);
+    localStorage.setItem('warpMode', mode);
+  }, [warpMode, initWarpStars]);
+
+  // Animate warp stars
+  const animateWarpStars = useCallback((speedMultiplier = 1.0) => {
+    if (!warpCanvasRef.current) return;
+    
+    const canvas = warpCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Update and draw stars
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    
+    warpStarsRef.current.forEach((star) => {
+      // Move star closer to viewer (faster with speedMultiplier)
+      star.z -= 1 * speedMultiplier;
+      
+      // Reset star when it gets too close
+      if (star.z <= 0) {
+        star.z = MAX_DEPTH;
+        star.x = Math.random() * canvas.width * 2 - canvas.width;
+        star.y = Math.random() * canvas.height * 2 - canvas.height;
+      }
+      
+      // Project star position to 2D
+      const factor = MAX_DEPTH / (star.z || 1);
+      const starX = star.x * factor + centerX;
+      const starY = star.y * factor + centerY;
+      
+      // Only draw stars within canvas bounds
+      if (starX >= 0 && starX <= canvas.width && starY >= 0 && starY <= canvas.height) {
+        // Calculate star size based on depth
+        const size = Math.max(0.5, (1 - star.z / MAX_DEPTH) * 2);
+        
+        // Calculate brightness based on depth
+        const opacity = Math.min(1, (1 - star.z / MAX_DEPTH) * 1.5);
+        
+        // Draw star
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.arc(starX, starY, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+    
+    // Continue animation
+    warpAnimationFrameIdRef.current = requestAnimationFrame(() => animateWarpStars(speedMultiplier));
+  }, []);
+  
+  // Load warp mode from localStorage on init
+  useEffect(() => {
+    const savedMode = localStorage.getItem('warpMode') as WarpMode | null;
+    if (savedMode && savedMode !== 'none') {
+      // Don't auto-start, just remember the last used mode
+      setWarpMode(savedMode);
+    }
+  }, []);
+  
+  // Handle window resize for warp canvas
+  useEffect(() => {
+    const handleResize = () => {
+      if (warpCanvasRef.current) {
+        warpCanvasRef.current.width = window.innerWidth;
+        warpCanvasRef.current.height = window.innerHeight;
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Cleanup warp on unmount
+  useEffect(() => {
+    return () => {
+      if (warpAnimationFrameIdRef.current) {
+        cancelAnimationFrame(warpAnimationFrameIdRef.current);
+      }
+      
+      if (warpCanvasRef.current) {
+        document.body.removeChild(warpCanvasRef.current);
+      }
+      
+      document.body.classList.remove('bg-black');
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  // Exit full warp mode with meteor
+  const handleExitWarp = useCallback(() => {
+    setWarpModeWithEffects('none');
+  }, [setWarpModeWithEffects]);
+
   // Load initial data
   useEffect(() => {
     const storedHistory = JSON.parse(localStorage.getItem('history') || '[]');
@@ -106,6 +298,14 @@ function App() {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   }, []);
+
+  // Warp distraction handler - moved after showToast is defined
+  const handleWarpDistraction = useCallback(() => {
+    if (isSessionActive && !isPaused) {
+      setDistractionCount(prev => prev + 1);
+      showToast("Distraction recorded in warp mode!");
+    }
+  }, [isSessionActive, isPaused, setDistractionCount, showToast]);
 
   // Calculate total break time from all completed breaks
   const totalBreakTimeMs = useMemo(() => 
@@ -357,11 +557,30 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <DarkModeToggle />
+      
+      {/* Exit Button for Full Warp Mode */}
+      {showExitButton && (
+        <button
+          onClick={handleExitWarp}
+          className="fixed top-4 right-4 z-[10000] bg-red-600 hover:bg-red-700 text-white p-3 rounded-full shadow-lg transition-all transform hover:scale-110"
+          title="Exit Warp Mode"
+        >
+          💥
+        </button>
+      )}
+      
+      {/* Distraction Button in Warp Mode */}
+      {showDistractionInWarp && isSessionActive && !isPaused && (
+        <button
+          onClick={handleWarpDistraction}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] bg-amber-600 hover:bg-amber-700 text-white px-4 py-3 rounded-full shadow-lg transition-all"
+          title="Record Distraction"
+        >
+          ☄️ Distracted
+        </button>
+      )}
+      
       <div className="max-w-6xl mx-auto p-6">
-        <header className="p-8 pb-2 flex justify-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">DEEP WORK: ULTIMATE DASHBOARD</h1>
-        </header>
-        
         {/* Main layout grid - updated column widths */}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[345px_minmax(575px,1fr)_300px]">
           {/* Left Column: Actions (top) and Notepad (bottom) */}
@@ -372,6 +591,11 @@ function App() {
           
           {/* Middle Column: Timer & Session History */}
           <div className="space-y-6 min-w-0">
+            {/* Centered Main Title over middle column with Starfield button */}
+            <div className="flex justify-center pt-2 pb-4 relative">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">DEEP WORK: ULTIMATE DASHBOARD</h1>
+            </div>
+            
             {/* Focus Input and Timer Section */}
             <div className={`bg-white dark:bg-gray-800 rounded-lg p-6 relative
               ${totalStreakSessions > 0 ? 
@@ -459,19 +683,33 @@ function App() {
 
             {/* Session History Section */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700 relative">
-              {/* Totals Section - Redesigned to stack values and order by size */}
+              {/* Totals Section - Redesigned to keep box shape with underlying bar */}
               <div className="grid grid-cols-2 gap-3 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg mb-4">
-                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded shadow-sm">
+                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded shadow-sm relative overflow-hidden">
                   <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Focus</div>
-                  <div className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                  <div className="text-xl font-bold text-gray-800 dark:text-gray-200 relative z-10">
                     {formatTotalDuration(totalFocusTimeMs)}
                   </div>
+                  {/* Underlying Progress Bar */}
+                  <div 
+                    className="absolute bottom-0 left-0 h-[5px] bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-500 ease-out"
+                    style={{ 
+                      width: `${Math.min(100, (totalFocusTimeMs / (240 * 60 * 1000)) * 100)}%`
+                    }}
+                  ></div>
                 </div>
-                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded shadow-sm">
+                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded shadow-sm relative overflow-hidden">
                   <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Break</div>
-                  <div className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                  <div className="text-xl font-bold text-gray-800 dark:text-gray-200 relative z-10">
                     {formatTotalDuration(totalBreakTimeMs)}
                   </div>
+                  {/* Underlying Progress Bar */}
+                  <div 
+                    className="absolute bottom-0 left-0 h-[5px] bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500 ease-out"
+                    style={{ 
+                      width: `${Math.min(100, (totalBreakTimeMs / (240 * 60 * 1000)) * 100)}%`
+                    }}
+                  ></div>
                 </div>
               </div>
               
@@ -504,6 +742,36 @@ function App() {
            
             {/* Updated MusicPlayer with isSessionActive prop */}
             <MusicPlayer isSessionActive={isSessionActive} />
+            
+            {/* Immersion Mode Controls */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-3">Immersion Mode</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setWarpModeWithEffects('background')}
+                  className={`rounded bg-zinc-800 text-white hover:bg-blue-600 transition text-sm px-2 py-1 ${warpMode === 'background' ? 'ring-2 ring-blue-500' : ''}`}
+                  title="Stars visible behind dashboard"
+                >
+                  ✨ Warp Background
+                </button>
+                <button
+                  onClick={() => setWarpModeWithEffects('full')}
+                  className={`rounded bg-zinc-800 text-white hover:bg-blue-600 transition text-sm px-2 py-1 ${warpMode === 'full' ? 'ring-2 ring-blue-500' : ''}`}
+                  title="Full immersive starfield"
+                >
+                  🌌 Warp Full
+                </button>
+                {warpMode !== 'none' && (
+                  <button
+                    onClick={() => setWarpModeWithEffects('none')}
+                    className="rounded bg-red-700 text-white hover:bg-red-800 transition text-sm px-2 py-1"
+                    title="Turn off warp effects"
+                  >
+                    ⏹️ Stop
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

@@ -126,21 +126,27 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
       }
       
       // Clean up previous analyzer
-      if (sourceNodeRef.current) {
-        sourceNodeRef.current.disconnect();
-        sourceNodeRef.current = null;
-      }
-      
-      if (analyserRef.current) {
+      if (analyserRef.current && audioContextRef.current) {
         try {
           analyserRef.current.disconnect();
         } catch (e) {
           // Ignore disconnect errors if already disconnected
         }
+        analyserRef.current = null;
       }
       
+      if (sourceNodeRef.current) {
+        try {
+          sourceNodeRef.current.disconnect();
+        } catch (e) {
+          // Ignore disconnect errors
+        }
+        sourceNodeRef.current = null;
+      }
+      
+      // Don't close the audio context, just suspend it
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.suspend();
+        audioContextRef.current.suspend().catch(e => console.error('Failed to suspend audio context:', e));
       }
       
       // Clear canvas if it exists
@@ -173,11 +179,12 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
       analyserRef.current.fftSize = 256;
     }
     
-    // Only create source node if it doesn't exist and audio element exists
+    // Recreate source node only if needed
     if (!sourceNodeRef.current && currentAudioRef.current && audioContextRef.current && analyserRef.current) {
       try {
-        // Create the source node
+        // Create the source node and connect the chain properly
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
+        // Connect nodes: source -> analyser -> destination
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
       } catch (e) {

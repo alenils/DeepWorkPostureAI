@@ -113,7 +113,7 @@ export const Notepad = () => {
       
       {/* Shortcut hint */}
       <p className="text-[10px] italic opacity-50 pt-1 text-center text-gray-600 dark:text-gray-400">
-        {navigator.platform.includes('Mac') ? '⌃ ⇧ T' : 'Ctrl + Shift + T'} inserts timestamp
+        Alt + Shift + T inserts timestamp
       </p>
     </div>
   );
