@@ -163,9 +163,11 @@ function App() {
     setRemainingTime(0); // Reset remaining time display explicitly
     setCurrentGoal(''); // Reset the goal when a session ends
 
-    // 3. Check if this is a streak session (distractions <= 2) and increment streak count
-    if (distractionCount <= 2) {
+    // 3. Update streak: reset if distractions >= 3, else increment
+    if (distractionCount < 3) {
       setTotalStreakSessions(prev => prev + 1);
+    } else {
+      setTotalStreakSessions(0);
     }
 
     // 4. Prepare finished session data
@@ -382,7 +384,10 @@ function App() {
             >
               {/* Streak badge */}
               {totalStreakSessions > 0 && (
-                <div className="absolute -top-2 -right-2 bg-[color:var(--accent-green)] text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+                <div 
+                  className="absolute -top-2 -right-2 bg-[color:var(--accent-green)] text-white text-xs font-bold px-2 py-1 rounded-full shadow-md" 
+                  title="Keep it under 3 distractions to grow your focus streak"
+                >
                   🔥 x{totalStreakSessions}
                 </div>
               )}
