@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { msToClock } from '../utils/time';
 
-export const MusicPlayer = () => {
+interface MusicPlayerProps {
+  isSessionActive?: boolean;
+}
+
+export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   const currentAudioRef = useRef<HTMLAudioElement>(null);
   const nextAudioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [songs, setSongs] = useState<string[]>([]);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [nextSongIndex, setNextSongIndex] = useState(1);
@@ -13,14 +22,23 @@ export const MusicPlayer = () => {
   const [isCrossFading, setIsCrossFading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isEqEnabled, setIsEqEnabled] = useState(false);
+  const [isLoopEnabled, setIsLoopEnabled] = useState(true);
+  const [playInSession, setPlayInSession] = useState(false);
   const fadeIntervalRef = useRef<number | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const prevIsSessionActiveRef = useRef(isSessionActive);
   
   // Load songs using import.meta.glob
   useEffect(() => {
     try {
-      const songModules = import.meta.glob('/public/sounds/song*.mp3', { eager: true });
+      const songModules = import.meta.glob('/public/sounds/*.mp3', { eager: true });
       const songPaths = Object.keys(songModules)
+        .filter(path => !path.includes('start.mp3') && 
+                        !path.includes('pause.mp3') && 
+                        !path.includes('done.mp3') && 
+                        !path.includes('check.mp3') && 
+                        !path.includes('cancel.mp3') &&
+                        !path.includes('distraction.mp3'))
         .map(path => path.replace('/public', ''))
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
       
@@ -32,7 +50,7 @@ export const MusicPlayer = () => {
     }
   }, []);
 
-  // Initialize next song index and load last played song from localStorage
+  // Initialize next song index and load last played song and preferences from localStorage
   useEffect(() => {
     if (songs.length > 0) {
       const savedIndex = localStorage.getItem('lastSongIndex');
@@ -43,15 +61,32 @@ export const MusicPlayer = () => {
       } else {
         setNextSongIndex(songs.length > 1 ? 1 : 0);
       }
+      
+      // Load loop preference
+      const loopPreference = localStorage.getItem('flowLoop');
+      if (loopPreference !== null) {
+        setIsLoopEnabled(loopPreference === 'true');
+      }
+      
+      // Load session play preference
+      const sessionPlayPreference = localStorage.getItem('playInSession');
+      if (sessionPlayPreference !== null) {
+        setPlayInSession(sessionPlayPreference === 'true');
+      }
     }
   }, [songs]);
 
-  // Extract song name from path
+  // Extract and format song name from path
   useEffect(() => {
     if (songs.length > 0) {
       const path = songs[currentSongIndex];
       const fileName = path.split('/').pop() || '';
-      const name = fileName.replace(/\.[^/.]+$/, '').replace('song', 'Song '); // Remove extension and format name
+      // Remove extension and replace underscores and %20 with spaces
+      const name = fileName
+        .replace(/\.[^/.]+$/, '')
+        .replace(/_/g, ' ')
+        .replace(/%20/g, ' ');
+      
       setSongName(name);
       
       // Save current index to localStorage
@@ -61,7 +96,7 @@ export const MusicPlayer = () => {
 
   // Update current time for progress bar
   useEffect(() => {
-    if (!isPlaying || !currentAudioRef.current) return;
+    if (!currentAudioRef.current) return;
     
     const updateTime = () => {
       if (currentAudioRef.current) {
@@ -71,6 +106,7 @@ export const MusicPlayer = () => {
       }
     };
     
+    // Always monitor time to keep progress bar in sync
     animationFrameRef.current = requestAnimationFrame(updateTime);
     
     return () => {
@@ -78,7 +114,100 @@ export const MusicPlayer = () => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isPlaying]);
+  }, []);
+
+  // Initialize audio context and analyzer for equalizer
+  useEffect(() => {
+    if (!isEqEnabled || !currentAudioRef.current) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      
+      // Clean up previous analyzer
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
+      }
+      
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.suspend();
+      }
+      
+      // Clear canvas if it exists
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      
+      return;
+    }
+    
+    // Set up audio context and analyzer
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } else if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+    
+    if (!analyserRef.current) {
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+    }
+    
+    if (!sourceNodeRef.current && currentAudioRef.current) {
+      sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
+      sourceNodeRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+    }
+    
+    const analyser = analyserRef.current;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const barWidth = canvas.width / bufferLength * 2.5;
+    let x = 0;
+    
+    const renderFrame = () => {
+      animationFrameRef.current = requestAnimationFrame(renderFrame);
+      
+      x = 0;
+      analyser.getByteFrequencyData(dataArray);
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * canvas.height;
+        
+        // Use gradient for bars
+        const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+        gradient.addColorStop(0, '#3B82F6'); // blue-500
+        gradient.addColorStop(0.5, '#60A5FA'); // blue-400
+        gradient.addColorStop(1, '#93C5FD'); // blue-300
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        
+        x += barWidth + 1;
+      }
+    };
+    
+    renderFrame();
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isEqEnabled]);
 
   // Start cross-fade when current song is near end
   useEffect(() => {
@@ -108,6 +237,15 @@ export const MusicPlayer = () => {
   // Handle cross-fade between tracks
   const startCrossFade = () => {
     if (!currentAudioRef.current || !nextAudioRef.current || songs.length <= 1) return;
+    
+    // Check if we should stop after current song based on loop setting
+    if (!isLoopEnabled && currentSongIndex === songs.length - 1) {
+      if (currentAudioRef.current) {
+        // Let the song finish but don't start the next one
+        setIsPlaying(false);
+        return;
+      }
+    }
     
     setIsCrossFading(true);
     const currentAudio = currentAudioRef.current;
@@ -173,15 +311,35 @@ export const MusicPlayer = () => {
         fadeIntervalRef.current = null;
         setIsCrossFading(false);
       }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
     }
   }, [isPlaying, currentSongIndex, songs]);
+
+  // Handle session active changes for "Only play when session is ON" feature
+  useEffect(() => {
+    if (playInSession) {
+      // If state changed from not active to active, play
+      if (!prevIsSessionActiveRef.current && isSessionActive) {
+        setIsPlaying(true);
+      }
+      // If state changed from active to not active, pause
+      else if (prevIsSessionActiveRef.current && !isSessionActive) {
+        setIsPlaying(false);
+      }
+    }
+    
+    // Update the ref for next comparison
+    prevIsSessionActiveRef.current = isSessionActive;
+  }, [isSessionActive, playInSession]);
 
   // Handle audio ended event (if cross-fade somehow fails)
   const handleAudioEnded = () => {
     if (!isCrossFading && songs.length > 1) {
+      // If we're on the last track and loop is disabled, stop playback
+      if (!isLoopEnabled && currentSongIndex === songs.length - 1) {
+        setIsPlaying(false);
+        return;
+      }
+      
       setCurrentSongIndex(nextSongIndex);
       setNextSongIndex((nextSongIndex + 1) % songs.length);
     }
@@ -218,10 +376,10 @@ export const MusicPlayer = () => {
     setNextSongIndex((nextSongIndex + 1) % songs.length);
     setIsCrossFading(false);
     
-    // Always restart with new track
-    if (isPlaying && currentAudioRef.current) {
+    // Restart with new track if currently playing
+    if (currentAudioRef.current) {
       setTimeout(() => {
-        if (currentAudioRef.current) {
+        if (currentAudioRef.current && isPlaying) {
           currentAudioRef.current.play().catch(console.error);
         }
       }, 50);
@@ -257,10 +415,10 @@ export const MusicPlayer = () => {
     setNextSongIndex(currentSongIndex);
     setIsCrossFading(false);
     
-    // Always restart with new track
-    if (isPlaying && currentAudioRef.current) {
+    // Restart with new track if currently playing
+    if (currentAudioRef.current) {
       setTimeout(() => {
-        if (currentAudioRef.current) {
+        if (currentAudioRef.current && isPlaying) {
           currentAudioRef.current.play().catch(console.error);
         }
       }, 50);
@@ -279,15 +437,83 @@ export const MusicPlayer = () => {
     setCurrentTime(newTime);
   };
 
+  // Toggle loop mode
+  const toggleLoop = () => {
+    const newValue = !isLoopEnabled;
+    setIsLoopEnabled(newValue);
+    localStorage.setItem('flowLoop', newValue.toString());
+  };
+
+  // Toggle equalizer
+  const toggleEqualizer = () => {
+    setIsEqEnabled(!isEqEnabled);
+  };
+
+  // Toggle playInSession mode
+  const togglePlayInSession = () => {
+    const newValue = !playInSession;
+    setPlayInSession(newValue);
+    localStorage.setItem('playInSession', newValue.toString());
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mt-6">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">🎵 Music</h2>
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">🎵 Flow Booster</h2>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={togglePlayInSession}
+            className={`p-1 rounded text-xs ${
+              playInSession 
+                ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300' 
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+            }`}
+            title="Only play when session is active"
+          >
+            ⏱️
+          </button>
+          <button
+            onClick={toggleLoop}
+            className={`p-1 rounded text-xs ${
+              isLoopEnabled 
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300' 
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+            }`}
+            title="Loop playlist"
+          >
+            ⟳
+          </button>
+          <button
+            onClick={toggleEqualizer}
+            className={`p-1 rounded text-xs ${
+              isEqEnabled 
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300' 
+                : 'bg-gray-100 text-gray-600 hover:bg-blue-50 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+            } transition-colors`}
+            title="Toggle Equalizer"
+          >
+            EQ
+          </button>
+        </div>
+      </div>
 
       {/* Song Name and Time */}
-      <div className="mb-3">
+      <div className="mb-2">
         <div className="text-center truncate text-gray-700 dark:text-gray-300 mb-1">
           {songs.length > 0 ? songName : "No songs found"}
         </div>
+        
+        {/* Equalizer Canvas */}
+        {isEqEnabled && (
+          <div className="my-2 bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-20"
+              width={300}
+              height={80}
+            />
+          </div>
+        )}
         
         {/* Time display */}
         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -312,9 +538,9 @@ export const MusicPlayer = () => {
       <div className="flex justify-center space-x-4">
         <button 
           onClick={handlePrevious}
-          className={`w-10 h-10 flex items-center justify-center rounded-full cursor-pointer
+          className={`w-10 h-10 flex items-center justify-center rounded-full 
             ${songs.length > 1 
-              ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' 
+              ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer' 
               : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'} 
             transition-colors`}
           aria-label="Previous song"
@@ -336,9 +562,9 @@ export const MusicPlayer = () => {
         </button>
         <button 
           onClick={handleNext}
-          className={`w-10 h-10 flex items-center justify-center rounded-full cursor-pointer
+          className={`w-10 h-10 flex items-center justify-center rounded-full 
             ${songs.length > 1 
-              ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' 
+              ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer' 
               : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'} 
             transition-colors`}
           aria-label="Next song"

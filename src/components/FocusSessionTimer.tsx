@@ -194,7 +194,7 @@ export const FocusSessionTimer = ({
           }}
           className={`
             goalInput
-            w-[3ch] text-center
+            w-[60px] text-center
             px-3 py-2 border rounded-lg
             focus:outline-none focus:ring-2 focus:ring-blue-500
             dark:bg-gray-700 dark:border-gray-600 dark:text-white

@@ -97,7 +97,7 @@ export const Notepad = () => {
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           ref={textareaRef}
-          placeholder="Jot down your thoughts here... (Alt+Shift+T to insert timestamp)"
+          placeholder="Jot down your thoughts here..."
           className="w-full bg-transparent resize-none outline-none text-gray-800 dark:text-gray-300 
             border-0 placeholder-gray-400 dark:placeholder-gray-500 p-0 leading-relaxed
             bg-[linear-gradient(transparent,transparent_calc(1.5rem-1px),rgba(0,0,0,0.06)_calc(1.5rem),transparent_calc(1.5rem+1px))]
@@ -110,6 +110,11 @@ export const Notepad = () => {
           }}
         />
       </div>
+      
+      {/* Shortcut hint */}
+      <p className="text-[10px] italic opacity-50 pt-1 text-center text-gray-600 dark:text-gray-400">
+        {navigator.platform.includes('Mac') ? '⌃ ⇧ T' : 'Ctrl + Shift + T'} inserts timestamp
+      </p>
     </div>
   );
 }; 

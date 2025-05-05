@@ -356,7 +356,11 @@ function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <DarkModeToggle />
       <div className="max-w-6xl mx-auto p-6">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">DeepWorkPostureAI</h1>
+        <header className="p-8 pb-2">
+          <div className="container mx-auto">
+            <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">DEEP WORK: ULTIMATE DASHBOARD</h1>
+          </div>
+        </header>
         
         {/* Main layout grid - updated column widths */}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[345px_minmax(575px,1fr)_300px]">
@@ -495,8 +499,8 @@ function App() {
               <CameraPlaceholder isSessionActive={isSessionActive} />
             </div>
            
-            {/* Music player */}
-            <MusicPlayer />
+            {/* Updated MusicPlayer with isSessionActive prop */}
+            <MusicPlayer isSessionActive={isSessionActive} />
           </div>
         </div>
 
