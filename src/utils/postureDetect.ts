@@ -18,6 +18,7 @@ export interface PostureAngles {
 export interface PostureStatus {
   good: boolean;
   angles: PostureAngles;
+  deltaPx?: number;
 }
 
 // Default thresholds
@@ -151,6 +152,11 @@ export function detectPostureWithBaseline(
   const neckPitchDiff = Math.abs(currentAngles.neckPitch - baselineAngles.neckPitch);
   const torsoAngleDiff = Math.abs(currentAngles.torsoAngle - baselineAngles.torsoAngle);
   
+  // Get eye line positions
+  const currentEyeLine = getEyeLine(currentLandmarks);
+  const baselineEyeLine = getEyeLine(baselineLandmarks);
+  const eyeLineDiff = currentEyeLine - baselineEyeLine;
+  
   // Check if within thresholds
   const neckOk = neckPitchDiff < (DEFAULT_NECK_THRESHOLD * thresholdMultiplier);
   const torsoOk = torsoAngleDiff < (DEFAULT_TORSO_THRESHOLD * thresholdMultiplier);
@@ -159,6 +165,21 @@ export function detectPostureWithBaseline(
   
   return {
     good: isGoodPosture,
-    angles: currentAngles
+    angles: currentAngles,
+    deltaPx: eyeLineDiff
   };
+}
+
+/**
+ * Gets the Y coordinate of the line between the eyes
+ */
+export function getEyeLine(landmarks: Landmarks): number {
+  const { nose, leftEye, rightEye } = {
+    nose: landmarks[POSE_LANDMARKS.NOSE],
+    leftEye: landmarks[POSE_LANDMARKS.LEFT_EYE],
+    rightEye: landmarks[POSE_LANDMARKS.RIGHT_EYE]
+  };
+  
+  // Use the average Y position of the eyes
+  return (leftEye.y + rightEye.y) / 2;
 } 

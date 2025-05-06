@@ -674,7 +674,8 @@ function App() {
       // Trigger posture nudge
       if (isSessionActive && !isPaused) {
         console.log("Posture nudge triggered after 10s of bad posture");
-        playDistractionSound();
+        // Remove the sound notification for posture issues
+        // playDistractionSound();
         setToast({
           show: true,
           message: "Please correct your posture!"

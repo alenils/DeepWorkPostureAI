@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { usePosture } from '../hooks/usePosture';
+import { useStablePosture } from '../hooks/useStablePosture';
 import { PoseLandmarksRenderer } from './PoseLandmarksRenderer';
+import { PoseOverlay } from './PoseOverlay';
 
 // Focus statements for camera caption
 const FOCUS_STATEMENTS = [
@@ -36,7 +37,15 @@ export const CameraPlaceholder = ({ isSessionActive = false, onPostureChange = (
   });
   
   // Initialize pose detection with sensitivityFactor
-  const posture = usePosture(true, sensitivityFactor);
+  const posture = useStablePosture(true, sensitivityFactor);
+  const latestEye = useRef<number | null>(null);
+  
+  // Update latestEye when posture.eyeY changes
+  useEffect(() => {
+    if (posture.eyeY !== null) {
+      latestEye.current = posture.eyeY;
+    }
+  }, [posture.eyeY]);
   
   // Set a random caption when session starts
   useEffect(() => {
@@ -193,9 +202,19 @@ export const CameraPlaceholder = ({ isSessionActive = false, onPostureChange = (
                 landmarks={posture.landmarks} 
                 width={videoSize.width} 
                 height={videoSize.height}
-                neckAngle={posture.neck}
-                torsoAngle={posture.torso}
+                neckAngle={0}
+                torsoAngle={0}
                 isGoodPosture={posture.good}
+              />
+            )}
+            {/* Add the eye-line guide overlay */}
+            {cameraActive && (
+              <PoseOverlay
+                width={videoSize.width}
+                height={videoSize.height}
+                good={posture.good}
+                baselineEye={posture.baselineEye}
+                currentEye={latestEye.current}
               />
             )}
             {currentCaption && (
@@ -208,7 +227,8 @@ export const CameraPlaceholder = ({ isSessionActive = false, onPostureChange = (
             {cameraActive && (
               <div className="absolute top-2 right-2 p-2 rounded bg-black/50 text-white text-xs">
                 Posture: {posture.isActive ? (posture.good ? 'Good ✅' : 'Bad ❌') : 'Off'}<br />
-                Neck: {posture.neck.toFixed(1)}° | Torso: {posture.torso.toFixed(1)}°
+                {posture.baselineEye !== null && latestEye.current !== null && 
+                  `Eye Pos: ${((latestEye.current - posture.baselineEye) * videoSize.height).toFixed(1)}px`}
               </div>
             )}
             
@@ -226,7 +246,7 @@ export const CameraPlaceholder = ({ isSessionActive = false, onPostureChange = (
                   {posture.isActive ? 'Posture ON' : 'Posture OFF'}
                 </button>
                 <button
-                  onClick={posture.calibratePosture}
+                  onClick={posture.calibrate}
                   className="bg-gray-700/80 hover:bg-gray-600 text-white px-3 py-1 rounded font-semibold"
                 >
                   Calibrate
