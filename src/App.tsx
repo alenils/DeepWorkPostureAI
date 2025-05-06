@@ -45,9 +45,9 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-// Star field animation constants
-const STAR_COUNT = 400; // Increased to 400 stars for warp full mode
-const STAR_COUNT_BG = 350; // Increased to 350 stars for background mode
+// Star field animation constants (increased by ~30% for immediate fullness)
+const STAR_COUNT = 520; // ~30% more stars for full warp
+const STAR_COUNT_BG = 455; // ~30% more stars for background warp
 const MAX_DEPTH = 300;
 
 // Warp mode types
@@ -165,13 +165,6 @@ function App() {
         document.body.style.overflow = 'hidden';
         setShowExitButton(true);
         setShowDistractionInWarp(true);
-        
-        // Add fading to warp UI buttons
-        setTimeout(() => {
-          document.querySelectorAll('.warp-control-button').forEach(el => {
-            el.classList.add('opacity-50');
-          });
-        }, 100);
       } else {
         // Background warp
         canvas.style.position = 'fixed';
@@ -181,19 +174,17 @@ function App() {
         canvas.style.pointerEvents = 'none';
         canvas.style.opacity = '0.7';
         
-        // Add fading to white numeric text
-        setTimeout(() => {
-          document.querySelectorAll('.text-white, .dark\\:text-white, .text-gray-200, .dark\\:text-gray-200').forEach(el => {
-            if (el.textContent && /[0-9]/.test(el.textContent)) {
-              el.classList.add('opacity-70', 'warp-dimmed-text');
-            }
-          });
-          // Dim the minutes input in background mode
-          const minutesInput = document.getElementById('minutesInput');
-          if (minutesInput) {
-            minutesInput.classList.add('warp-dim');
+        // Fade numeric text immediately
+        document.querySelectorAll('.text-white, .dark\\:text-white, .text-gray-200, .dark\\:text-gray-200').forEach(el => {
+          if (el.textContent && /[0-9]/.test(el.textContent)) {
+            el.classList.add('opacity-70', 'warp-dimmed-text');
           }
-        }, 100);
+        });
+        // Dim the minutes input immediately
+        const minutesInput = document.getElementById('minutesInput');
+        if (minutesInput) {
+          minutesInput.classList.add('warp-dim');
+        }
       }
       
       document.body.appendChild(canvas);
@@ -202,7 +193,7 @@ function App() {
       // Initialize stars (more stars for full warp)
       initWarpStars(isFull ? STAR_COUNT : STAR_COUNT_BG);
       
-      // Start animation
+      // Start animation immediately
       animateWarpStars(warpSpeed);
     }
     
@@ -635,38 +626,29 @@ function App() {
       {warpMode !== 'full' && <DarkModeToggle />}
 
       {/* FULL WARP Controls */}
-      {warpMode === 'full' && (
-        <div id="warpControls" className="fixed top-4 right-4 flex gap-3 z-[10000]">
+      {warpMode !== 'none' && (
+        <div id="warpControls" className="absolute top-4 right-4 z-[10000] flex flex-col gap-2 items-end text-xs text-white">
           {isSessionActive && !isPaused && (
-            <button 
+            <button
+              id="warpDistract"
               onClick={handleWarpDistraction}
-              className="opacity-40 hover:opacity-70 transition text-red-300 text-lg"
+              className="opacity-40 hover:opacity-70 transition bg-red-800/60 px-3 py-1 rounded"
               title="Log distraction"
             >
-              ❌
+              DISTRACTION
             </button>
           )}
-          <button 
+          <button
+            id="exitWarpFull"
             onClick={handleExitWarp}
-            className="opacity-40 hover:opacity-70 transition text-gray-200 text-lg"
-            title="Exit warp"
+            className="opacity-40 hover:opacity-70 transition bg-gray-700/60 px-3 py-1 rounded"
+            title={`Exit ${warpMode === 'full' ? 'Full' : 'Background'} Warp`}
           >
-            ✖️
+            EXIT {warpMode === 'full' ? 'FULL' : 'BACKGROUND'} WARP
           </button>
         </div>
       )}
       
-      {/* Background Warp Exit Button */}
-      {warpMode === 'background' && (
-        <button
-          onClick={() => setWarpModeWithEffects('none')}
-          className="fixed top-4 right-4 z-[1000] bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-semibold transition-opacity dark:opacity-90 dark:hover:opacity-100 text-xs"
-          title="Exit background warp"
-        >
-          Exit Warp Background
-        </button>
-      )}
-
       <div className="max-w-6xl mx-auto p-6">
         {/* Main layout grid - updated column widths */}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[345px_minmax(575px,1fr)_300px]">
@@ -738,7 +720,7 @@ function App() {
                     </div>
                     <div className="flex-shrink-0">
                       <DistractionButton 
-                        isVisible={isSessionActive && !isPaused && warpMode !== 'full'}
+                        isVisible={isSessionActive && !isPaused}
                         onDistraction={handleDistraction}
                         distractionCount={distractionCount}
                         className="warp-control-button"
