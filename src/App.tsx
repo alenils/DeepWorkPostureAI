@@ -626,25 +626,23 @@ function App() {
       {warpMode !== 'full' && <DarkModeToggle />}
 
       {/* FULL WARP Controls */}
-      {warpMode !== 'none' && (
-        <div id="warpControls" className="absolute top-4 right-4 z-[10000] flex flex-col gap-2 items-end text-xs text-white">
-          {isSessionActive && !isPaused && (
-            <button
-              id="warpDistract"
-              onClick={handleWarpDistraction}
-              className="opacity-40 hover:opacity-70 transition bg-red-800/60 px-3 py-1 rounded"
-              title="Log distraction"
-            >
-              DISTRACTION
-            </button>
-          )}
+      {(warpMode === 'background' || warpMode === 'full') && (
+        <div id="warpControls" className="absolute bottom-4 right-4 z-[10000] flex gap-3 items-center opacity-40 hover:opacity-70 transition">
           <button
-            id="exitWarpFull"
-            onClick={handleExitWarp}
-            className="opacity-40 hover:opacity-70 transition bg-gray-700/60 px-3 py-1 rounded"
-            title={`Exit ${warpMode === 'full' ? 'Full' : 'Background'} Warp`}
+            id="warpDistract"
+            onClick={handleWarpDistraction}
+            className="text-red-300 text-sm px-2 py-1 bg-black/30 backdrop-blur-sm rounded"
+            title="Log distraction"
           >
-            EXIT {warpMode === 'full' ? 'FULL' : 'BACKGROUND'} WARP
+            DISTRACTED
+          </button>
+          <button
+            id="exitWarp"
+            onClick={handleExitWarp}
+            className="text-gray-100 text-sm px-2 py-1 bg-black/30 backdrop-blur-sm rounded"
+            title="Exit warp"
+          >
+            EXIT WARP
           </button>
         </div>
       )}
