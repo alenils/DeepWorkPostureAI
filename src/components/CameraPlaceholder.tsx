@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { usePosture } from '../hooks/usePosture';
+import { PoseLandmarksRenderer } from './PoseLandmarksRenderer';
 
 // Focus statements for camera caption
 const FOCUS_STATEMENTS = [
@@ -19,13 +21,22 @@ const FOCUS_STATEMENTS = [
   "BUILDING NEURAL PATHWAYS"
 ];
 
-export const CameraPlaceholder = ({ isSessionActive = false }) => {
+export const CameraPlaceholder = ({ isSessionActive = false, onPostureChange = (isGood: boolean) => {} }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState('');
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const streamRef = useRef<MediaStream | null>(null);
   const [currentCaption, setCurrentCaption] = useState('');
+  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
+  const [sensitivityFactor, setSensitivityFactor] = useState<number>(() => {
+    // Load sensitivity from localStorage, default to 1.0 (which means 10° neck threshold, 8° torso threshold)
+    const storedValue = localStorage.getItem('postureSensitivity');
+    return storedValue ? parseFloat(storedValue) : 1.0;
+  });
+  
+  // Initialize pose detection with sensitivityFactor
+  const posture = usePosture(true, sensitivityFactor);
   
   // Set a random caption when session starts
   useEffect(() => {
@@ -37,6 +48,7 @@ export const CameraPlaceholder = ({ isSessionActive = false }) => {
     }
   }, [isSessionActive, cameraEnabled]);
   
+  // Initialize webcam
   useEffect(() => {
     let stream: MediaStream | null = null;
     
@@ -65,6 +77,20 @@ export const CameraPlaceholder = ({ isSessionActive = false }) => {
           videoRef.current.srcObject = stream;
           setCameraActive(true);
           setError('');
+          
+          // Initialize video dimensions
+          videoRef.current.addEventListener('loadedmetadata', () => {
+            if (videoRef.current) {
+              setVideoSize({
+                width: videoRef.current.videoWidth,
+                height: videoRef.current.videoHeight
+              });
+              
+              // Start posture detection once video is loaded
+              console.log("Video loaded, starting pose detection");
+              posture.startDetection(videoRef.current);
+            }
+          });
         }
       } catch (err) {
         console.error('Failed to access webcam:', err);
@@ -86,26 +112,56 @@ export const CameraPlaceholder = ({ isSessionActive = false }) => {
         streamRef.current = null;
       }
     };
-  }, [cameraEnabled]);
+  }, [cameraEnabled, posture]);
+  
+  // Report posture changes to parent component (only when session is active)
+  useEffect(() => {
+    if (isSessionActive) {
+      onPostureChange(posture.good);
+    }
+  }, [posture.good, isSessionActive, onPostureChange]);
 
+  // Toggle camera
   const toggleCamera = () => {
     setCameraEnabled(prev => !prev);
+  };
+  
+  // Handle sensitivity change
+  const handleSensitivityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = parseFloat(e.target.value);
+    setSensitivityFactor(value);
+    localStorage.setItem('postureSensitivity', value.toString());
   };
   
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden w-full lg:w-[125%] lg:-mr-[25%]">
       <div className="p-4 pb-2 flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">🎥 Posture Tracker</h2>
-        <button
-          onClick={toggleCamera}
-          className={`px-3 py-1 rounded font-semibold transition-opacity ${
-            cameraEnabled 
-              ? 'bg-red-600 hover:bg-red-700 text-white dark:opacity-90 dark:hover:opacity-100' 
-              : 'bg-green-500 text-white hover:bg-green-600'
-          }`}
-        >
-          {cameraEnabled ? 'TURN OFF' : 'TURN ON'}
-        </button>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+          🎥 Posture Tracker {posture.isActive && (posture.good ? '✅' : '❌')}
+        </h2>
+        <div className="flex space-x-2">
+          <select
+            value={sensitivityFactor.toString()}
+            onChange={handleSensitivityChange}
+            className="px-2 py-1 rounded font-semibold text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white"
+            title="Adjust sensitivity of posture detection"
+          >
+            <option value="0.5">5°/4° (High)</option>
+            <option value="1.0">10°/8° (Normal)</option>
+            <option value="1.5">15°/12° (Medium)</option>
+            <option value="2.0">20°/16° (Low)</option>
+          </select>
+          <button
+            onClick={toggleCamera}
+            className={`px-3 py-1 rounded font-semibold transition-opacity ${
+              cameraEnabled 
+                ? 'bg-red-600 hover:bg-red-700 text-white dark:opacity-90 dark:hover:opacity-100' 
+                : 'bg-green-500 text-white hover:bg-green-600'
+            }`}
+          >
+            {cameraEnabled ? 'TURN OFF' : 'TURN ON'}
+          </button>
+        </div>
       </div>
       
       <div className="relative aspect-video bg-black h-auto lg:h-[125%]">
@@ -132,11 +188,49 @@ export const CameraPlaceholder = ({ isSessionActive = false }) => {
               muted
               className="w-full h-full object-cover"
             />
+            {posture.landmarks && cameraActive && (
+              <PoseLandmarksRenderer 
+                landmarks={posture.landmarks} 
+                width={videoSize.width} 
+                height={videoSize.height}
+                neckAngle={posture.neck}
+                torsoAngle={posture.torso}
+                isGoodPosture={posture.good}
+              />
+            )}
             {currentCaption && (
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex justify-center">
+              <div className="absolute bottom-14 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex justify-center">
                 <p className="text-white text-xs italic opacity-90 font-medium text-center">
                   {currentCaption}
                 </p>
+              </div>
+            )}
+            {cameraActive && (
+              <div className="absolute top-2 right-2 p-2 rounded bg-black/50 text-white text-xs">
+                Posture: {posture.isActive ? (posture.good ? 'Good ✅' : 'Bad ❌') : 'Off'}<br />
+                Neck: {posture.neck.toFixed(1)}° | Torso: {posture.torso.toFixed(1)}°
+              </div>
+            )}
+            
+            {/* Always visible camera controls */}
+            {cameraActive && (
+              <div className="absolute bottom-3 inset-x-0 flex justify-center gap-4 text-xs">
+                <button
+                  onClick={posture.toggleActive}
+                  className={`px-3 py-1 rounded font-semibold ${
+                    posture.isActive 
+                      ? 'bg-blue-500/80 hover:bg-blue-600 text-white' 
+                      : 'bg-gray-500/80 hover:bg-gray-600 text-white'
+                  }`}
+                >
+                  {posture.isActive ? 'Posture ON' : 'Posture OFF'}
+                </button>
+                <button
+                  onClick={posture.calibratePosture}
+                  className="bg-gray-700/80 hover:bg-gray-600 text-white px-3 py-1 rounded font-semibold"
+                >
+                  Calibrate
+                </button>
               </div>
             )}
           </>

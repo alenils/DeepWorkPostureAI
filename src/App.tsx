@@ -97,6 +97,12 @@ function App() {
   const [showExitButton, setShowExitButton] = useState(false);
   const [showDistractionInWarp, setShowDistractionInWarp] = useState(false);
   
+  // Posture tracking state
+  const [postureStatus, setPostureStatus] = useState<boolean>(true);
+  const [badPostureStartTime, setBadPostureStartTime] = useState<number | null>(null);
+  const badPostureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const badPostureTimeThreshold = 10000; // 10 seconds before triggering nudge
+  
   // Initialize warp stars
   const initWarpStars = useCallback((count: number) => {
     const stars = [];
@@ -623,6 +629,79 @@ function App() {
     };
   }, []);
 
+  // Handle posture change from camera component - only trigger nudges during active sessions
+  const handlePostureChange = useCallback((isGoodPosture: boolean) => {
+    console.log("Posture status:", isGoodPosture ? "GOOD" : "BAD", isSessionActive ? "(in session)" : "(outside session)");
+    
+    setPostureStatus(isGoodPosture);
+    
+    // Only start timers if in an active session
+    if (!isSessionActive) {
+      // Clear any pending timeout if session is not active
+      if (badPostureTimeoutRef.current) {
+        clearTimeout(badPostureTimeoutRef.current);
+        badPostureTimeoutRef.current = null;
+      }
+      return;
+    }
+    
+    // If posture becomes bad, start the timer
+    if (!isGoodPosture && badPostureStartTime === null) {
+      console.log("Starting bad posture timer");
+      setBadPostureStartTime(Date.now());
+    } 
+    // If posture becomes good, clear the timer
+    else if (isGoodPosture && badPostureStartTime !== null) {
+      console.log("Clearing bad posture timer - posture corrected");
+      setBadPostureStartTime(null);
+      
+      // Clear any pending timeout
+      if (badPostureTimeoutRef.current) {
+        clearTimeout(badPostureTimeoutRef.current);
+        badPostureTimeoutRef.current = null;
+      }
+    }
+  }, [isSessionActive, badPostureStartTime]);
+  
+  // Monitor bad posture and trigger notification after threshold (only during active sessions)
+  useEffect(() => {
+    if (!isSessionActive || isPaused || badPostureTimeoutRef.current || !badPostureStartTime || postureStatus) {
+      return;
+    }
+    
+    // If posture is bad and we have a start time, set up the timeout
+    badPostureTimeoutRef.current = setTimeout(() => {
+      // Trigger posture nudge
+      if (isSessionActive && !isPaused) {
+        console.log("Posture nudge triggered after 10s of bad posture");
+        playDistractionSound();
+        setToast({
+          show: true,
+          message: "Please correct your posture!"
+        });
+        
+        // Update session data with posture issue
+        if (lastSession && lastSession.type === 'session') {
+          setLastSession({
+            ...lastSession,
+            posture: (lastSession.posture || 0) + 1
+          });
+        }
+      }
+      
+      // Reset timer but keep tracking
+      badPostureTimeoutRef.current = null;
+      setBadPostureStartTime(null);
+    }, badPostureTimeThreshold);
+    
+    return () => {
+      if (badPostureTimeoutRef.current) {
+        clearTimeout(badPostureTimeoutRef.current);
+        badPostureTimeoutRef.current = null;
+      }
+    };
+  }, [postureStatus, badPostureStartTime, isSessionActive, isPaused, lastSession, playDistractionSound]);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       {warpMode !== 'full' && <DarkModeToggle />}
@@ -807,7 +886,10 @@ function App() {
           <div className="flex flex-col gap-6">
             {/* Camera placeholder */}
             <div>
-              <CameraPlaceholder isSessionActive={isSessionActive} />
+              <CameraPlaceholder 
+                isSessionActive={isSessionActive} 
+                onPostureChange={handlePostureChange} 
+              />
             </div>
            
             {/* Updated MusicPlayer with isSessionActive prop */}
