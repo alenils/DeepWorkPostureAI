@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import React from 'react';
 
 interface PoseOverlayProps {
   width: number;
@@ -8,7 +9,7 @@ interface PoseOverlayProps {
   currentEye: number | null;
 }
 
-export const PoseOverlay = ({ 
+const PoseOverlayComponent = ({ 
   width, 
   height, 
   good, 
@@ -57,4 +58,7 @@ export const PoseOverlay = ({
       className="absolute inset-0 z-20 pointer-events-none"
     />
   );
-}; 
+};
+
+// Wrap the component in React.memo to prevent unnecessary re-renders
+export const PoseOverlay = React.memo(PoseOverlayComponent); 

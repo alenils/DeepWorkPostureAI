@@ -10,7 +10,7 @@ import { useTimer } from './hooks/useTimer'
 import { msToClock, formatTotalDuration } from './utils/time'
 import { Notepad } from './components/Notepad'
 import { ActionsList } from './components/ActionsList'
-import { CameraPlaceholder } from './components/CameraPlaceholder'
+import { PostureTracker } from './components/PostureTracker'
 import { Toast } from './components/Toast'
 import { useSound } from './hooks/useSound'
 import { MusicPlayer } from './components/MusicPlayer'
@@ -887,7 +887,7 @@ function App() {
           <div className="flex flex-col gap-6">
             {/* Camera placeholder */}
             <div>
-              <CameraPlaceholder 
+              <PostureTracker 
                 isSessionActive={isSessionActive} 
                 onPostureChange={handlePostureChange} 
               />
