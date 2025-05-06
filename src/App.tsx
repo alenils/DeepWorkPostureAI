@@ -10,10 +10,11 @@ import { useTimer } from './hooks/useTimer'
 import { msToClock, formatTotalDuration } from './utils/time'
 import { Notepad } from './components/Notepad'
 import { ActionsList } from './components/ActionsList'
-import { PostureTracker } from './components/PostureTracker'
+import { PostureView } from './components/PostureView'
 import { Toast } from './components/Toast'
 import { useSound } from './hooks/useSound'
 import { MusicPlayer } from './components/MusicPlayer'
+import { usePosture } from './context/PostureContext'
 
 // Unified history item types
 interface SessionData {
@@ -887,7 +888,7 @@ function App() {
           <div className="flex flex-col gap-6">
             {/* Camera placeholder */}
             <div>
-              <PostureTracker 
+              <PostureView 
                 isSessionActive={isSessionActive} 
                 onPostureChange={handlePostureChange} 
               />
