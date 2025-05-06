@@ -137,6 +137,11 @@ function App() {
       document.querySelectorAll('.warp-control-button').forEach(el => {
         el.classList.remove('opacity-50', 'warp-faded-button');
       });
+      // Remove warp-dim class from minute input
+      const minutesInput = document.getElementById('minutesInput');
+      if (minutesInput) {
+        minutesInput.classList.remove('warp-dim');
+      }
     }
     
     // Set up new warp mode
@@ -183,6 +188,11 @@ function App() {
               el.classList.add('opacity-70', 'warp-dimmed-text');
             }
           });
+          // Dim the minutes input in background mode
+          const minutesInput = document.getElementById('minutesInput');
+          if (minutesInput) {
+            minutesInput.classList.add('warp-dim');
+          }
         }, 100);
       }
       
@@ -597,32 +607,66 @@ function App() {
     return 'shadow-[0_0_0_2px_var(--tw-shadow-color),_0_0_10px_var(--tw-shadow-color)]';
   }, [totalStreakSessions]);
 
+  // Add CSS for warp-dim class
+  useEffect(() => {
+    // Create a style element
+    const styleEl = document.createElement('style');
+    const cssContent = `
+      #minutesInput.warp-dim {
+        opacity: 0.55 !important;
+      }
+      .dark #minutesInput.warp-dim {
+        opacity: 0.65 !important;
+      }
+    `;
+    styleEl.textContent = cssContent;
+    document.head.appendChild(styleEl);
+    
+    // Clean up on unmount
+    return () => {
+      if (styleEl && document.head.contains(styleEl)) {
+        document.head.removeChild(styleEl);
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <DarkModeToggle />
-      
-      {/* Exit Button for Full Warp Mode */}
-      {showExitButton && (
-        <button
-          onClick={handleExitWarp}
-          className="fixed top-4 right-4 z-[10000] bg-red-600 hover:bg-red-700 text-white p-3 rounded-full shadow-lg transition-all transform hover:scale-110"
-          title="Exit Warp Mode"
-        >
-          💥
-        </button>
+      {warpMode !== 'full' && <DarkModeToggle />}
+
+      {/* FULL WARP Controls */}
+      {warpMode === 'full' && (
+        <div id="warpControls" className="fixed top-4 right-4 flex gap-3 z-[10000]">
+          {isSessionActive && !isPaused && (
+            <button 
+              onClick={handleWarpDistraction}
+              className="opacity-40 hover:opacity-70 transition text-red-300 text-lg"
+              title="Log distraction"
+            >
+              ❌
+            </button>
+          )}
+          <button 
+            onClick={handleExitWarp}
+            className="opacity-40 hover:opacity-70 transition text-gray-200 text-lg"
+            title="Exit warp"
+          >
+            ✖️
+          </button>
+        </div>
       )}
       
-      {/* Distraction Button in Warp Mode */}
-      {showDistractionInWarp && isSessionActive && !isPaused && (
+      {/* Background Warp Exit Button */}
+      {warpMode === 'background' && (
         <button
-          onClick={handleWarpDistraction}
-          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] bg-amber-600 hover:bg-amber-700 text-white px-4 py-3 rounded-full shadow-lg transition-all"
-          title="Record Distraction"
+          onClick={() => setWarpModeWithEffects('none')}
+          className="fixed top-4 right-4 z-[1000] bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-semibold transition-opacity dark:opacity-90 dark:hover:opacity-100 text-xs"
+          title="Exit background warp"
         >
-          ☄️ Distracted
+          Exit Warp Background
         </button>
       )}
-      
+
       <div className="max-w-6xl mx-auto p-6">
         {/* Main layout grid - updated column widths */}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[345px_minmax(575px,1fr)_300px]">
@@ -694,7 +738,7 @@ function App() {
                     </div>
                     <div className="flex-shrink-0">
                       <DistractionButton 
-                        isVisible={isSessionActive && !isPaused}
+                        isVisible={isSessionActive && !isPaused && warpMode !== 'full'}
                         onDistraction={handleDistraction}
                         distractionCount={distractionCount}
                         className="warp-control-button"
@@ -837,28 +881,6 @@ function App() {
           streakCount={totalStreakSessions}
           onStreakEnded={() => setTotalStreakSessions(0)}
         />
-        
-        {/* Warp Exit Button - Only show in full warp mode */}
-        {showExitButton && (
-          <button
-            onClick={() => setWarpModeWithEffects('none')}
-            className="fixed top-4 right-4 z-[10000] bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-semibold transition-opacity dark:opacity-90 dark:hover:opacity-100 warp-control-button"
-            title="Exit warp mode"
-          >
-            ❌ EXIT WARP
-          </button>
-        )}
-        
-        {/* Warp Distraction Button - Only show in full warp mode */}
-        {showDistractionInWarp && isSessionActive && !isPaused && (
-          <button
-            onClick={handleDistraction}
-            className="fixed top-4 left-4 z-[10000] bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-semibold transition-opacity dark:opacity-90 dark:hover:opacity-100 warp-control-button"
-            title="Log a distraction"
-          >
-            ☄️ DISTRACTED
-          </button>
-        )}
         
         {/* Toast Notifications */}
         {toast.show && <Toast message={toast.message} />}
