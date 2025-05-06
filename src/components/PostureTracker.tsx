@@ -19,7 +19,6 @@ const PostureTrackerComponent = ({
   const [error, setError] = useState('');
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const streamRef = useRef<MediaStream | null>(null);
-  const [currentCaption, setCurrentCaption] = useState('');
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   
   // Initialize pose detection
@@ -33,7 +32,7 @@ const PostureTrackerComponent = ({
     }
   }, [posture.eyeY]);
   
-  // Initialize webcam - but only do this once
+  // Initialize webcam once
   useEffect(() => {
     if (!cameraEnabled) {
       if (streamRef.current) {
@@ -67,7 +66,6 @@ const PostureTrackerComponent = ({
               });
               
               // Start posture detection once video is loaded
-              console.log("Video loaded, starting pose detection");
               posture.startDetection(videoRef.current);
             }
           });
@@ -128,7 +126,7 @@ const PostureTrackerComponent = ({
         </div>
       </div>
       
-      <div className="relative aspect-video bg-black h-auto lg:h-[125%]">
+      <div className="relative aspect-video bg-black h-auto lg:h-[125%]" style={{height:'130%'}}>
         {!cameraEnabled ? (
           <div className="absolute inset-0 flex items-center justify-center p-6 bg-gray-900">
             <p className="text-white text-center text-lg font-semibold">
@@ -146,10 +144,11 @@ const PostureTrackerComponent = ({
         ) : (
           <>
             <video
+              key="posture-video"
               ref={videoRef}
               playsInline
-              muted
               autoPlay
+              muted
               className="w-full h-full object-cover rounded"
             />
             {posture.landmarks && cameraActive && (

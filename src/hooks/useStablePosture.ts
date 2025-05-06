@@ -37,6 +37,7 @@ export function useStablePosture(enabled = true, sensitivity = 1.0): StablePostu
   // Use refs instead of state for pose and camera to prevent recreation
   const poseRef = useRef<Pose>();
   const cameraRef = useRef<Camera>();
+  const startedRef = useRef(false);
   
   // Store active state and sensitivity in refs to avoid dependency issues
   const isActiveRef = useRef(isActive);
@@ -104,28 +105,42 @@ export function useStablePosture(enabled = true, sensitivity = 1.0): StablePostu
     }
   }, []); // Empty deps because we're using refs for all dependencies
 
-  // Initialize pose detection only once
+  // Initialize camera and pose exactly once
   useEffect(() => {
-    if (poseRef.current) return; // already initialized
+    if (startedRef.current) return;
+    if (!videoRef.current) return;
 
-    poseRef.current = new Pose({
-      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
-    });
-    poseRef.current.setOptions({ 
+    const pose = new Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({ 
       modelComplexity: 1, 
       smoothLandmarks: true,
-      enableSegmentation: false,
-      smoothSegmentation: false,
       minDetectionConfidence: 0.5, 
       minTrackingConfidence: 0.5 
     });
-    poseRef.current.onResults(handlePoseResults);
+    pose.onResults(handlePoseResults);
+    poseRef.current = pose;
 
-    return () => {  // clean up once on unmount
-      cameraRef.current?.stop();
-      poseRef.current?.close();
+    const cam = new Camera(videoRef.current, {
+      width: 640, 
+      height: 480,
+      onFrame: async () => pose.send({ image: videoRef.current! })
+    });
+    cam.start().then(() => console.log('[Posture] camera started'));
+    cameraRef.current = cam;
+
+    startedRef.current = true;
+
+    // Cleanup on unmount
+    return () => {
+      if (cameraRef.current) {
+        cameraRef.current.stop();
+      }
+      if (poseRef.current) {
+        poseRef.current.close();
+      }
+      startedRef.current = false;
     };
-  }, [handlePoseResults]); // handlePoseResults is now stable
+  }, []); // Empty deps - runs only once
 
   // Function to calibrate posture
   const calibrate = useCallback(() => {
@@ -140,28 +155,9 @@ export function useStablePosture(enabled = true, sensitivity = 1.0): StablePostu
     }
   }, []);
 
-  // Function to start pose detection on a video element
+  // Function to start pose detection on a video element - simplified
   const startDetection = useCallback((video: HTMLVideoElement) => {
-    if (!poseRef.current) return;
-    
     videoRef.current = video;
-    console.log("Starting pose detection on video element");
-    
-    if (!cameraRef.current) {
-      cameraRef.current = new Camera(video, {
-        width: 640, 
-        height: 480,
-        onFrame: async () => {
-          if (videoRef.current && poseRef.current) {
-            await poseRef.current.send({ image: videoRef.current });
-          }
-        }
-      });
-      
-      cameraRef.current.start()
-        .then(() => console.log('[Posture] camera started'))
-        .catch(err => console.error('[Posture] camera error', err));
-    }
   }, []);
 
   // Function to toggle posture tracking active state
