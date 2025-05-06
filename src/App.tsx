@@ -59,6 +59,7 @@ function App() {
   const playPauseSound = useSound('pause.mp3');
   const playDoneSound = useSound('done.mp3');
   const playCancelSound = useSound('cancel.mp3');
+  const playDistractionSound = useSound('distraction.mp3');
   
   // Lifted Timer Config State
   const [minutes, setMinutes] = useState<string>('25');
@@ -343,13 +344,14 @@ function App() {
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   }, []);
 
-  // Warp distraction handler - moved after showToast is defined
+  // Warp distraction handler
   const handleWarpDistraction = useCallback(() => {
     if (isSessionActive && !isPaused) {
       setDistractionCount(prev => prev + 1);
+      playDistractionSound();
       showToast("Distraction recorded in warp mode!");
     }
-  }, [isSessionActive, isPaused, setDistractionCount, showToast]);
+  }, [isSessionActive, isPaused, setDistractionCount, showToast, playDistractionSound]);
 
   // Calculate total break time from all completed breaks
   const totalBreakTimeMs = useMemo(() => 
