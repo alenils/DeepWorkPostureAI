@@ -1,24 +1,68 @@
-import { FilesetResolver, PoseLandmarker, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import {
+  FilesetResolver,
+  PoseLandmarker,
+  PoseLandmarkerOptions,
+  PoseLandmarkerResult,
+  NormalizedLandmark,
+} from "@mediapipe/tasks-vision";
 
-let detector: PoseLandmarker;
+class PoseDetector {
+  private poseLandmarker?: PoseLandmarker;
+  private resultCallback?: (result: PoseLandmarkerResult, timestampMs: number) => void;
+  private lastVideoTime = -1;
 
-export async function loadPose() {
-  if (detector) return detector;
+  async initialize(
+    modelAssetPath: string = "/models/pose_landmarker_lite.task",
+    resultCallback: (result: PoseLandmarkerResult, timestampMs: number) => void
+  ): Promise<void> {
+    this.resultCallback = resultCallback;
 
-  const vision = await FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
-  );
+    try {
+      const vision = await FilesetResolver.forVisionTasks(
+        "/wasm"
+      );
 
-  detector = await PoseLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_light/float16/pose_landmarker_light.task',
-      delegate: 'GPU',
-    },
-    runningMode: 'VIDEO',
-    numPoses: 1,
-  });
-  return detector;
+      const options: PoseLandmarkerOptions = {
+        baseOptions: {
+          modelAssetPath: modelAssetPath,
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+        outputSegmentationMasks: false,
+      };
+
+      this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, options);
+      console.log("PoseLandmarker initialized successfully.");
+    } catch (error) {
+      console.error("Failed to initialize PoseLandmarker:", error);
+      throw error;
+    }
+  }
+
+  detect(videoElement: HTMLVideoElement, timestampMs: number): void {
+    if (!this.poseLandmarker || !this.resultCallback || !videoElement) {
+      return;
+    }
+
+    if (videoElement.currentTime === this.lastVideoTime) {
+        return;
+    }
+    this.lastVideoTime = videoElement.currentTime;
+
+    this.poseLandmarker.detectForVideo(videoElement, timestampMs, (result) => {
+        this.resultCallback!(result, timestampMs);
+    });
+  }
+
+  close(): void {
+    this.poseLandmarker?.close();
+    console.log("PoseLandmarker closed.");
+  }
 }
 
-export type PoseResult = PoseLandmarkerResult; 
+const poseDetector = new PoseDetector();
+export default poseDetector; 
