@@ -143,11 +143,13 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const detectLoop = () => {
         if (!isDetecting || !videoRef.current || videoRef.current.paused || videoRef.current.ended) {
+          console.log("DETECT LOOP: Exiting. isDetecting:", isDetecting, "videoRef.current:", !!videoRef.current, "paused:", videoRef.current?.paused, "ended:", videoRef.current?.ended);
           if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
           return;
         }
         if (videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) { // videoRef.current.videoWidth > 0
           const now = performance.now();
+          console.log("DETECT LOOP: Attempting to call poseDetector.detect. Video ready state:", videoRef.current.readyState, "Video dimensions:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
           poseDetector.detect(videoRef.current, now);
         }
         animationFrameId.current = requestAnimationFrame(detectLoop);

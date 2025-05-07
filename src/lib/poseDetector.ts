@@ -44,18 +44,20 @@ class PoseDetector {
   }
 
   detect(videoElement: HTMLVideoElement, timestampMs: number): void {
+    console.log("POSE DETECTOR: 'detect' method CALLED. Timestamp:", timestampMs, "Video el:", !!videoElement, "Callback defined:", !!this.resultCallback, "Landmarker initialized:", !!this.poseLandmarker);
     if (!this.poseLandmarker || !this.resultCallback || !videoElement) {
-      // console.warn("PoseLandmarker not initialized, callback not set, or video element missing.");
+      console.warn("POSE DETECTOR: Early return - PoseLandmarker not initialized:", !this.poseLandmarker, "callback not set:", !this.resultCallback, "video element missing:", !videoElement);
       return;
     }
 
     // Prevent processing the same frame multiple times
     if (videoElement.currentTime === this.lastVideoTime) {
+        console.log("POSE DETECTOR: Skipping duplicate frame with same currentTime:", videoElement.currentTime);
         return;
     }
     this.lastVideoTime = videoElement.currentTime;
 
-    console.log("PoseDetector.detect called. Timestamp:", timestampMs, "Callback defined:", !!this.resultCallback);
+    console.log("POSE DETECTOR: About to call this.poseLandmarker.detectForVideo. Video time:", videoElement.currentTime);
 
     // The actual detection happens via the callback provided during initialization
     this.poseLandmarker.detectForVideo(videoElement, timestampMs, (result) => {
