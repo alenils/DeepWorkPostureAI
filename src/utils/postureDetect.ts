@@ -57,42 +57,56 @@ export function calculateAngle(
 
 export function isGoodPosture(
   landmarks: NormalizedLandmark[],
-  baselinePose: NormalizedLandmark[] | null
+  baselinePose: NormalizedLandmark[] | null | undefined, // Explicitly allow null/undefined
+  thresholds: { threshold_Y_drop?: number } = { threshold_Y_drop: 0.03 } // Make Y_drop configurable, default to 0.03
 ): { isGood: boolean; message: string } {
   if (!landmarks || landmarks.length === 0) {
     return { isGood: false, message: "No landmarks detected." };
   }
 
-  // If no baseline is set, return neutral status
-  if (!baselinePose || baselinePose.length === 0) {
-    return { isGood: true, message: "Calibrate to begin." };
-  }
-
-  // Get nose landmarks
   const nose = landmarks[POSE_LANDMARKS.NOSE];
-  const baselineNose = baselinePose[POSE_LANDMARKS.NOSE];
-
-  // Ensure nose landmarks exist
-  if (!nose || !baselineNose) {
-    return { isGood: false, message: "Missing key landmarks for posture analysis." };
+  if (!nose) {
+    return { isGood: false, message: "Nose landmark missing." };
   }
 
-  // Threshold for head drop (5% of video height)
-  const threshold_Y_drop = 0.05;
+  // If not calibrated (baselinePose is null/undefined).
+  // The message "Ready to calibrate" or "Calibrate to begin" should be set by PostureContext based on its own logic.
+  if (!baselinePose) {
+    // console.log("POSTURE CHECK: No baseline or not calibrated. Returning default good.");
+    return { isGood: true, message: "Calibrate to begin." }; // This message is used if PostureContext calls this *before* its calibration logic sets a more specific message like "Ready to calibrate"
+  }
 
-  // Check if current nose Y position has dropped below calibrated position
-  if (nose.y > baselineNose.y + threshold_Y_drop) {
+  const baselineNose = baselinePose[POSE_LANDMARKS.NOSE];
+  if (!baselineNose) {
+    // This case implies baselinePose exists but is somehow malformed for NOSE.
+    // This state should ideally be prevented by robust baseline setting.
+    console.warn("POSTURE CHECK: Baseline pose set, but baseline nose landmark is missing.");
+    return { isGood: false, message: "Calibration error: Baseline nose missing." };
+  }
+
+  const calibratedNoseY = baselineNose.y;
+  const currentNoseY = nose.y;
+  // Use the provided threshold_Y_drop, or default if not in thresholds object.
+  const effective_threshold_Y_drop = thresholds.threshold_Y_drop ?? 0.03; // Default to 0.03 if not provided
+
+  // Log the values being compared
+  console.log(`POSTURE CHECK (Calibrated): BaselineNoseY: ${calibratedNoseY.toFixed(3)}, CurrentNoseY: ${currentNoseY.toFixed(3)}, DropThreshold: ${effective_threshold_Y_drop.toFixed(3)}, BadIfCurrentGreaterThan: ${(calibratedNoseY + effective_threshold_Y_drop).toFixed(3)}`);
+
+  // Check for head drop: currentNoseY is LARGER if head is lower (Y=0 at top)
+  if (currentNoseY > calibratedNoseY + effective_threshold_Y_drop) {
+    console.log("POSTURE CHECK: Result -> BAD (Head dropped)");
     return { isGood: false, message: "Head dropped!" };
   }
-
-  // Optional: Additional checks for side-to-side movement
-  const threshold_X_movement = 0.1;
+  
+  // Optional X-axis check (re-added from previous logic as it was missing in user's provided snippet for this step)
+  const threshold_X_movement = 0.1; 
   if (Math.abs(nose.x - baselineNose.x) > threshold_X_movement) {
+    console.log("POSTURE CHECK: Result -> BAD (Head moved sideways)");
     return { isGood: false, message: "Head moved sideways!" };
   }
 
-  // If passed all checks, posture is good
-  return { isGood: true, message: "Good posture!" };
+  console.log("POSTURE CHECK: Result -> GOOD");
+  return { isGood: true, message: "Posture OK!" };
 }
 
 // Get the Y coordinate of the eye line for display purposes
@@ -100,6 +114,10 @@ export function getEyeLine(landmarks: NormalizedLandmark[]): number {
   const leftEye = landmarks[POSE_LANDMARKS.LEFT_EYE];
   const rightEye = landmarks[POSE_LANDMARKS.RIGHT_EYE];
   
+  if (!leftEye || !rightEye) {
+    // console.warn("Eye landmarks not available for eye line calculation.");
+    return 0; // Return 0 or some default if eyes aren't detected
+  }
   // Use the average Y position of the eyes
   return (leftEye.y + rightEye.y) / 2;
 } 
