@@ -75,7 +75,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
              const status = isGoodPosture(currentLandmarks, baselinePose || null);
              setPostureStatus(status); // Show feedback even during calibration adjustment
         } else {
-          setPostureStatus({ isGood: true, message: "Calibrate to begin." });
+          setPostureStatus({ isGood: true, message: "Ready to calibrate." });
         }
       } else {
         setDetectedLandmarks(undefined);
@@ -203,7 +203,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
       const currentBaseline = detectedLandmarks.map(lm => ({ ...lm }));
       setBaselinePose(currentBaseline);
       setIsCalibrated(true);
-      setPostureStatus({ isGood: true, message: "Calibrated!" });
+      setPostureStatus({ isGood: true, message: "Calibrated! Maintaining good posture." });
       console.log("Posture calibrated with current landmarks:", currentBaseline);
     } else {
       setPostureStatus({ isGood: false, message: "Cannot calibrate - no landmarks detected yet. Ensure you are visible." });

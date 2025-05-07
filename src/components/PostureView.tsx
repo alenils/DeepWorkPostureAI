@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { usePosture } from "@/context/PostureContext";
-import { getEyeLine } from "@/utils/postureDetect";
+import { getEyeLine, POSE_LANDMARKS } from "@/utils/postureDetect";
 
 // Define pose connections for skeleton visualization
 const POSE_CONNECTIONS: [number, number][] = [
@@ -57,6 +57,23 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw horizontal bar for posture baseline if calibrated
+    if (isCalibrated && baselinePose && baselinePose.length > 0) {
+      const baselineNose = baselinePose[POSE_LANDMARKS.NOSE];
+      if (baselineNose) {
+        const barHeight = 10; // Height of the bar in pixels
+        const yPos = baselineNose.y;
+        
+        // Set bar color based on posture status
+        ctx.fillStyle = isGoodPosture 
+          ? "rgba(0, 255, 0, 0.5)"  // Green with transparency
+          : "rgba(255, 0, 0, 0.5)"; // Red with transparency
+        
+        // Draw the horizontal bar across the full width of the canvas
+        ctx.fillRect(0, yPos * canvas.height - barHeight / 2, canvas.width, barHeight);
+      }
+    }
+
     // Draw landmarks if available
     if (landmarks && landmarks.length > 0) {
       ctx.save(); // Save context state
@@ -93,7 +110,8 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
         }
       });
 
-      // Draw baseline pose if calibrated and available
+      // Comment out baseline pose dots to reduce visual clutter
+      /*
       if (isCalibrated && baselinePose && baselinePose.length > 0) {
         ctx.strokeStyle = "rgba(0, 0, 255, 0.5)"; // Blue for baseline
         ctx.lineWidth = 1;
@@ -126,6 +144,7 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
           }
         });
       }
+      */
       ctx.restore(); // Restore context state
     }
   }, [videoElement, landmarks, baselinePose, isGoodPosture, isCalibrated]); // Add videoElement to dependencies
