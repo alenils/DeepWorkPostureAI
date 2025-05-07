@@ -8,6 +8,7 @@ type PoseCtx = {
   good: boolean; 
   neck: number; 
   torso: number;
+  angles: {neck: number, torso: number};
   landmarks: Landmarks | null;
   stream: MediaStream | null;
   calibrate: () => void;
@@ -49,6 +50,7 @@ export const PostureProvider: React.FC<{children: React.ReactNode}> = ({children
         const lm = res.poseLandmarks.map(p => ({...p}));
         latestRef.current = lm;
         setLM(lm);
+        console.log("FIRST LANDMARKS", lm.length);
         if (baselineRef.current) {
           const {good, angles} = detectPostureWithBaseline(lm, baselineRef.current, 1);
           setGood(good); 
@@ -63,10 +65,14 @@ export const PostureProvider: React.FC<{children: React.ReactNode}> = ({children
       onFrame: async () => pose.send({image: video})
     });
     
-    cam.start().then(() => {
-      console.log('[Posture] singleton camera started');
-      setStream(video.srcObject as MediaStream);
-    });
+    // Warm-up call before camera start
+    (async () => {
+      await pose.send({ image: video });  // warm-up -> onResults will fire
+      cam.start().then(() => {
+        console.log('[Posture] singleton camera started');
+        setStream(video.srcObject as MediaStream);
+      });
+    })();
     
     return () => { 
       cam.stop(); 
@@ -84,6 +90,7 @@ export const PostureProvider: React.FC<{children: React.ReactNode}> = ({children
       good,
       neck: angles.neck,
       torso: angles.torso,
+      angles,
       landmarks,
       stream,
       calibrate

@@ -13,7 +13,7 @@ export const PostureView = ({
   isSessionActive = false, 
   onPostureChange = () => {} 
 }: PostureViewProps) => {
-  const { stream, landmarks, good, calibrate } = usePosture();
+  const { stream, landmarks, good, angles, calibrate } = usePosture();
   const videoWrapper = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const visVideo = useRef<HTMLVideoElement>(null);
@@ -80,7 +80,7 @@ export const PostureView = ({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden w-full lg:w-[125%] lg:-mr-[25%]">
       <div className="p-4 pb-2 flex justify-between items-center">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-          🎥 Posture Tracker {good ? '✅' : '❌'}
+          🎥 Posture Tracker
         </h2>
         <div className="flex space-x-2">
           <button 
@@ -109,7 +109,7 @@ export const PostureView = ({
         
         {landmarks && (
           <div className="absolute top-2 right-2 p-2 rounded bg-black/50 text-white text-xs">
-            Posture: {good ? 'Good ✅' : 'Bad ❌'}
+            <span>{good ? '✅ Good' : '❌ Bad'} | Neck {angles.neck.toFixed(0)}°</span>
           </div>
         )}
       </div>
