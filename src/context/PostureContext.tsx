@@ -57,9 +57,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const handlePoseResults = useCallback(
     (result: PoseLandmarkerResult, timestampMs: number) => { // Corrected type for result
-      // console.log("Received pose results:", result, "at timestamp:", timestampMs);
+      console.log("PostureContext: handlePoseResults called. Result:", result, "Timestamp:", timestampMs);
       if (result.landmarks && result.landmarks.length > 0) {
         const currentLandmarks = result.landmarks[0]; // Assuming numPoses = 1
+        console.log("PostureContext: Setting detectedLandmarks to:", currentLandmarks);
         setDetectedLandmarks(currentLandmarks);
 
         if (isCalibrated) {
@@ -77,7 +78,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       } else {
         setDetectedLandmarks(undefined);
-        // console.log("No landmarks detected in this frame.");
+        console.log("No landmarks detected in this frame.");
         if (isCalibrated) {
             setPostureStatus({ isGood: false, message: "No person detected." });
         }
@@ -206,6 +207,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [setupPoseDetector]); // videoRef.current is not a stable dependency for useEffect directly
 
+  // Add a new useEffect to track detectedLandmarks changes
+  useEffect(() => {
+    console.log("PostureContext: detectedLandmarks state updated:", detectedLandmarks);
+  }, [detectedLandmarks]);
 
   useEffect(() => {
     // Cleanup on unmount

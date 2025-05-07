@@ -34,6 +34,7 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    console.log("CanvasOverlay: received landmarks prop:", landmarks);
     const canvas = canvasRef.current;
     const video = videoElement;
     if (!canvas || !video) return;
@@ -46,6 +47,7 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
     if (video.videoWidth > 0 && video.videoHeight > 0) {
         canvas.width = video.clientWidth; // Use clientWidth/Height for displayed size
         canvas.height = video.clientHeight;
+        console.log(`CanvasOverlay: canvas dimensions - width: ${canvas.width}, height: ${canvas.height}`);
     } else {
         // Fallback or wait if video dimensions aren't ready
         // For now, let's assume it might take a render cycle
