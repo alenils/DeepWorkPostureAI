@@ -13,9 +13,10 @@ export const PostureView = ({
   isSessionActive = false, 
   onPostureChange = () => {} 
 }: PostureViewProps) => {
-  const { landmarks, good, calibrate } = usePosture();
+  const { stream, landmarks, good, calibrate } = usePosture();
   const videoWrapper = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const visVideo = useRef<HTMLVideoElement>(null);
   const baselineEyeRef = useRef<number | null>(null);
 
   // Report posture changes to parent component (only when session is active)
@@ -25,9 +26,17 @@ export const PostureView = ({
     }
   }, [good, isSessionActive, onPostureChange]);
 
+  // Connect video stream to visible video element
+  useEffect(() => {
+    if (stream && visVideo.current) {
+      visVideo.current.srcObject = stream;
+      visVideo.current.play();
+    }
+  }, [stream]);
+
   // enlarge by 30%
   useEffect(() => {
-    if (!landmarks || !canvasRef.current || !videoWrapper.current) return;
+    if (!landmarks || !canvasRef.current) return;
     
     const w = 320 * 1.3, h = 240 * 1.3;
     canvasRef.current.width = w; 
@@ -84,7 +93,19 @@ export const PostureView = ({
       </div>
       
       <div className="relative" style={{height: '130%'}}>
-        <canvas ref={canvasRef} className="rounded" style={{width: '100%', height: '100%'}} />
+        {/* visible video */}
+        <video 
+          ref={visVideo} 
+          playsInline 
+          muted 
+          className="w-full h-full object-cover rounded" 
+        />
+        {/* canvas overlay */}
+        <canvas 
+          ref={canvasRef} 
+          className="absolute inset-0 pointer-events-none rounded" 
+          style={{width: '100%', height: '100%'}} 
+        />
         
         {landmarks && (
           <div className="absolute top-2 right-2 p-2 rounded bg-black/50 text-white text-xs">
