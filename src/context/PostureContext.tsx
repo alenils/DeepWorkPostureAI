@@ -54,6 +54,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isCalibrated, setIsCalibrated] = useState(false);
   const [isLoadingDetector, setIsLoadingDetector] = useState(false);
   const animationFrameId = useRef<number | null>(null);
+  const detectingRef = useRef<boolean>(false); // Ref to track detection across closures
 
   const handlePoseResults = useCallback(
     (result: PoseLandmarkerResult, timestampMs: number) => { // Corrected type for result
@@ -112,7 +113,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
       setCameraError("Video element not available.");
       return;
     }
-    setIsLoadingDetector(true); // Show loading while setting up camera and detector
+    setIsLoadingDetector(true);
     setCameraError(null);
 
     try {
@@ -138,19 +139,26 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
 
 
       console.log("Posture detection starting loop.");
-      // Ensure detection state is active before starting loop
       setIsDetecting(true);
+      detectingRef.current = true; // Ensure ref matches state for loop check
       setIsLoadingDetector(false);
 
       const detectLoop = () => {
-        if (!isDetecting || !videoRef.current || videoRef.current.paused || videoRef.current.ended) {
-          console.log("DETECT LOOP: Exiting. isDetecting:", isDetecting, "videoRef.current:", !!videoRef.current, "paused:", videoRef.current?.paused, "ended:", videoRef.current?.ended);
+        console.log("DETECT LOOP: Value of detectingRef.current INSIDE LOOP CHECK:", detectingRef.current);
+        if (!detectingRef.current || !videoRef.current || !videoRef.current.srcObject || videoRef.current.paused || videoRef.current.ended) {
+          console.log(
+            "DETECT LOOP: Exiting. detectingRef.current:", detectingRef.current,
+            "videoRef.current:", !!videoRef.current,
+            "srcObject:", !!videoRef.current?.srcObject,
+            "paused:", videoRef.current?.paused,
+            "ended:", videoRef.current?.ended
+          );
           if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
           return;
         }
-        if (videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) { // videoRef.current.videoWidth > 0
+        if (videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
           const now = performance.now();
-          console.log("DETECT LOOP: Attempting to call poseDetector.detect. Video ready state:", videoRef.current.readyState, "Video dimensions:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
+          console.log("DETECT LOOP: Attempting to call poseDetector.detect. Video ready state:", videoRef.current.readyState, "dimensions:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
           poseDetector.detect(videoRef.current, now);
         }
         animationFrameId.current = requestAnimationFrame(detectLoop);
@@ -171,6 +179,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const stopPostureDetection = () => {
     console.log("Stopping posture detection.");
+    detectingRef.current = false; // Stop loop from ref as well
     setIsDetecting(false);
     if (animationFrameId.current) {
       cancelAnimationFrame(animationFrameId.current);
