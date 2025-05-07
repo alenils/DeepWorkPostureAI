@@ -142,7 +142,7 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
   );
 };
 
-const PostureView: React.FC = () => {
+export const PostureView: React.FC = () => {
   const {
     videoRef,
     detectedLandmarks,
