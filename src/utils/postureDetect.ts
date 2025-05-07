@@ -58,7 +58,8 @@ export function calculateAngle(
 export function isGoodPosture(
   landmarks: NormalizedLandmark[],
   baselinePose: NormalizedLandmark[] | null | undefined, // Explicitly allow null/undefined
-  thresholds: { threshold_Y_drop?: number } = { threshold_Y_drop: 0.03 } // Make Y_drop configurable, default to 0.03
+  // Decrease default head drop threshold
+  thresholds: { threshold_Y_drop?: number } = { threshold_Y_drop: 0.02 } 
 ): { isGood: boolean; message: string } {
   if (!landmarks || landmarks.length === 0) {
     return { isGood: false, message: "No landmarks detected." };
@@ -69,40 +70,69 @@ export function isGoodPosture(
     return { isGood: false, message: "Nose landmark missing." };
   }
 
-  // If not calibrated (baselinePose is null/undefined).
-  // The message "Ready to calibrate" or "Calibrate to begin" should be set by PostureContext based on its own logic.
   if (!baselinePose) {
-    // console.log("POSTURE CHECK: No baseline or not calibrated. Returning default good.");
-    return { isGood: true, message: "Calibrate to begin." }; // This message is used if PostureContext calls this *before* its calibration logic sets a more specific message like "Ready to calibrate"
+    return { isGood: true, message: "Calibrate to begin." }; 
   }
 
   const baselineNose = baselinePose[POSE_LANDMARKS.NOSE];
   if (!baselineNose) {
-    // This case implies baselinePose exists but is somehow malformed for NOSE.
-    // This state should ideally be prevented by robust baseline setting.
     console.warn("POSTURE CHECK: Baseline pose set, but baseline nose landmark is missing.");
     return { isGood: false, message: "Calibration error: Baseline nose missing." };
   }
+  
+  // Get necessary landmarks for other checks
+  const leftEar = landmarks[POSE_LANDMARKS.LEFT_EAR];
+  const rightEar = landmarks[POSE_LANDMARKS.RIGHT_EAR];
+  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
 
+  // --- Head Drop Check --- 
   const calibratedNoseY = baselineNose.y;
   const currentNoseY = nose.y;
-  // Use the provided threshold_Y_drop, or default if not in thresholds object.
-  const effective_threshold_Y_drop = thresholds.threshold_Y_drop ?? 0.03; // Default to 0.03 if not provided
+  const effective_threshold_Y_drop = thresholds.threshold_Y_drop ?? 0.02; // Use passed or default 0.02
 
-  // Log the values being compared
-  console.log(`POSTURE CHECK (Calibrated): BaselineNoseY: ${calibratedNoseY.toFixed(3)}, CurrentNoseY: ${currentNoseY.toFixed(3)}, DropThreshold: ${effective_threshold_Y_drop.toFixed(3)}, BadIfCurrentGreaterThan: ${(calibratedNoseY + effective_threshold_Y_drop).toFixed(3)}`);
+  // console.log(`POSTURE CHECK (Calibrated): BaselineNoseY: ${calibratedNoseY.toFixed(3)}, CurrentNoseY: ${currentNoseY.toFixed(3)}, DropThreshold: ${effective_threshold_Y_drop.toFixed(3)}, BadIfCurrentGreaterThan: ${(calibratedNoseY + effective_threshold_Y_drop).toFixed(3)}`);
 
-  // Check for head drop: currentNoseY is LARGER if head is lower (Y=0 at top)
   if (currentNoseY > calibratedNoseY + effective_threshold_Y_drop) {
     console.log("POSTURE CHECK: Result -> BAD (Head dropped)");
     return { isGood: false, message: "Head dropped!" };
   }
   
-  // Optional X-axis check (re-added from previous logic as it was missing in user's provided snippet for this step)
-  const threshold_X_movement = 0.1; 
-  if (Math.abs(nose.x - baselineNose.x) > threshold_X_movement) {
+  // --- Sideways Head Movement / Tilt Check --- 
+  // Decrease threshold for sideways nose movement relative to baseline
+  const threshold_sideways_nose_movement = 0.03; 
+  if (Math.abs(nose.x - baselineNose.x) > threshold_sideways_nose_movement) {
     console.log("POSTURE CHECK: Result -> BAD (Head moved sideways)");
     return { isGood: false, message: "Head moved sideways!" };
+  }
+  // Add a basic tilt check based on ear height difference (relative)
+  if (leftEar && rightEar) {
+    const tiltThreshold = 0.025; // Smaller difference indicates tilt
+    if (Math.abs(leftEar.y - rightEar.y) > tiltThreshold) {
+        console.log("POSTURE CHECK: Result -> BAD (Head tilted)");
+        return { isGood: false, message: "Head tilted!" };
+    }
+  }
+  
+  // --- Forward Lean / Lean Back Check --- 
+  // Requires ear and shoulder landmarks
+  if (leftEar && rightEar && leftShoulder && rightShoulder) {
+    const earCenterX = (leftEar.x + rightEar.x) / 2;
+    const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+    
+    // Check for forward lean (ear X significantly less than shoulder X)
+    const forwardLeanThresholdX = 0.03; // Smaller distance indicates lean
+    if (earCenterX < shoulderCenterX - forwardLeanThresholdX) {
+        console.log("POSTURE CHECK: Result -> BAD (Leaning forward)");
+        return { isGood: false, message: "Leaning forward!" };
+    }
+
+    // Check for leaning back (ear X significantly greater than shoulder X)
+    const leanBackThresholdX = 0.02; // Adjust as needed
+    if (earCenterX > shoulderCenterX + leanBackThresholdX) {
+       console.log("POSTURE CHECK: Result -> BAD (Leaning back)");
+       return { isGood: false, message: "Leaning back!" };
+    }
   }
 
   console.log("POSTURE CHECK: Result -> GOOD");

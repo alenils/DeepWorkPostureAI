@@ -57,9 +57,10 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
       }
     }
 
+    // Draw current landmarks dots - REMOVED/COMMENTED OUT
+    /*
     if (landmarks && landmarks.length > 0) {
       ctx.save();
-      // POSE_CONNECTIONS drawing block fully removed/commented out here
       landmarks.forEach((landmark) => {
         if (landmark && landmark.visibility && landmark.visibility > 0.5 && typeof landmark.x === 'number' && typeof landmark.y === 'number') {
           ctx.beginPath();
@@ -70,6 +71,10 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
       });
       ctx.restore(); 
     }
+    */
+   // Keep the console log for dimensions if needed for debugging video size
+   console.log(`CanvasOverlay: video naturalW=${video?.videoWidth}, naturalH=${video?.videoHeight}, clientW=${video?.clientWidth}, clientH=${video?.clientHeight}. Set canvas size to w=${canvas.width}, h=${canvas.height}`);
+
   }, [videoElement, landmarks, baselinePose, isGoodPosture, isCalibrated]);
 
   return (
