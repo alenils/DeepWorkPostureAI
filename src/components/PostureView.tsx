@@ -70,8 +70,8 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
           const endLandmark = landmarks[connection[1]];
           if (startLandmark && endLandmark && startLandmark.visibility && startLandmark.visibility > 0.5 && endLandmark.visibility && endLandmark.visibility > 0.5) {
             ctx.beginPath();
-            ctx.moveTo(startLandmark.x * canvas.width, startLandmark.y * canvas.height);
-            ctx.lineTo(endLandmark.x * canvas.width, endLandmark.y * canvas.height);
+            ctx.moveTo((1 - startLandmark.x) * canvas.width, startLandmark.y * canvas.height);
+            ctx.lineTo((1 - endLandmark.x) * canvas.width, endLandmark.y * canvas.height);
             ctx.stroke();
           }
         });
@@ -82,7 +82,7 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
         if (landmark && landmark.visibility && landmark.visibility > 0.5) {
           ctx.beginPath();
           ctx.arc(
-            landmark.x * canvas.width,
+            (1 - landmark.x) * canvas.width,
             landmark.y * canvas.height,
             3, // Dot size
             0,
@@ -104,8 +104,8 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
                 const endLandmark = baselinePose[connection[1]];
                 if (startLandmark && endLandmark && startLandmark.visibility && startLandmark.visibility > 0.5 && endLandmark.visibility && endLandmark.visibility > 0.5) {
                     ctx.beginPath();
-                    ctx.moveTo(startLandmark.x * canvas.width, startLandmark.y * canvas.height);
-                    ctx.lineTo(endLandmark.x * canvas.width, endLandmark.y * canvas.height);
+                    ctx.moveTo((1 - startLandmark.x) * canvas.width, startLandmark.y * canvas.height);
+                    ctx.lineTo((1 - endLandmark.x) * canvas.width, endLandmark.y * canvas.height);
                     ctx.stroke();
                 }
             });
@@ -115,7 +115,7 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
           if (landmark && landmark.visibility && landmark.visibility > 0.5) {
             ctx.beginPath();
             ctx.arc(
-              landmark.x * canvas.width,
+              (1 - landmark.x) * canvas.width,
               landmark.y * canvas.height,
               2, // Smaller dot for baseline
               0,
