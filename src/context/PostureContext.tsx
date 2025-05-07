@@ -1,8 +1,16 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Pose, Results } from '@mediapipe/pose';
-import { Camera } from '@mediapipe/camera_utils';
 import { detectPostureWithBaseline } from '../utils/postureDetect';
 import { Landmarks } from '../utils/poseMath';
+import { loadDetector, detectPose } from '../utils/poseDetector';
+import { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+
+// Define NormalizedLandmark type to match MediaPipe's format
+interface NormalizedLandmark {
+  x: number;
+  y: number;
+  z: number;
+  visibility?: number;
+}
 
 type PoseCtx = {
   good: boolean; 
@@ -24,60 +32,100 @@ export const PostureProvider: React.FC<{children: React.ReactNode}> = ({children
   const [stream, setStream] = useState<MediaStream | null>(null);
   const baselineRef = useRef<Landmarks | null>(null);
   const latestRef = useRef<Landmarks | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const detectorRef = useRef<any>(null);
+  const rafRef = useRef<number | null>(null);
+
+  // Process pose detection results
+  const processPoseResults = (result: PoseLandmarkerResult) => {
+    if (result.landmarks && result.landmarks.length > 0) {
+      // Convert to our landmark format
+      const lm = result.landmarks[0].map((p: NormalizedLandmark) => ({
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        visibility: p.visibility || 0
+      }));
+      
+      latestRef.current = lm;
+      setLM(lm);
+      console.log("FIRST LANDMARKS", lm.length);
+      
+      if (baselineRef.current) {
+        const {good, angles} = detectPostureWithBaseline(lm, baselineRef.current, 1);
+        setGood(good); 
+        setAngles({neck: angles.neckPitch, torso: angles.torsoAngle});
+      }
+    }
+  };
+
+  // Run pose detection in animation frame
+  const detectPoseFrame = async () => {
+    if (videoRef.current && detectorRef.current) {
+      try {
+        const result = await detectPose(videoRef.current);
+        processPoseResults(result);
+      } catch (error) {
+        console.error("Error detecting pose:", error);
+      }
+      
+      rafRef.current = requestAnimationFrame(detectPoseFrame);
+    }
+  };
 
   // mount once
   useEffect(() => {
-    const video = document.createElement('video');
-    video.playsInline = true; 
-    video.muted = true; 
-    video.autoplay = true;
-    video.style.display = 'none';       // hidden element
-    document.body.appendChild(video);
-
-    const pose = new Pose({ 
-      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
-    });
-    
-    pose.setOptions({
-      modelComplexity: 1,
-      smoothLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
-    
-    pose.onResults((res: Results) => {
-      if (res.poseLandmarks) {
-        const lm = res.poseLandmarks.map(p => ({...p}));
-        latestRef.current = lm;
-        setLM(lm);
-        console.log("FIRST LANDMARKS", lm.length);
-        if (baselineRef.current) {
-          const {good, angles} = detectPostureWithBaseline(lm, baselineRef.current, 1);
-          setGood(good); 
-          setAngles({neck: angles.neckPitch, torso: angles.torsoAngle});
-        }
+    const setupCamera = async () => {
+      try {
+        // Create hidden video element
+        const video = document.createElement('video');
+        video.playsInline = true; 
+        video.muted = true; 
+        video.autoplay = true;
+        video.style.display = 'none';       // hidden element
+        document.body.appendChild(video);
+        videoRef.current = video;
+        
+        // Setup camera
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 },
+          audio: false
+        });
+        
+        video.srcObject = mediaStream;
+        await video.play();
+        setStream(mediaStream);
+        
+        // Load pose detector
+        console.log("Loading pose detector...");
+        const detector = await loadDetector();
+        detectorRef.current = detector;
+        console.log("Pose detector loaded");
+        
+        // Start detection loop
+        rafRef.current = requestAnimationFrame(detectPoseFrame);
+      } catch (error) {
+        console.error("Error setting up camera:", error);
       }
-    });
-
-    const cam = new Camera(video, {
-      width: 640, 
-      height: 480, 
-      onFrame: async () => pose.send({image: video})
-    });
+    };
     
-    // Warm-up call before camera start
-    (async () => {
-      await pose.send({ image: video });  // warm-up -> onResults will fire
-      cam.start().then(() => {
-        console.log('[Posture] singleton camera started');
-        setStream(video.srcObject as MediaStream);
-      });
-    })();
+    setupCamera();
     
     return () => { 
-      cam.stop(); 
-      pose.close(); 
-      video.remove(); 
+      // Clean up
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      
+      if (videoRef.current) {
+        const tracks = videoRef.current.srcObject as MediaStream;
+        if (tracks) {
+          tracks.getTracks().forEach(track => track.stop());
+        }
+        videoRef.current.remove();
+        videoRef.current = null;
+      }
     };
   }, []);
 

@@ -1,8 +1,20 @@
 import { useRef, useEffect } from 'react';
 import { usePosture } from '../context/PostureContext';
-import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
-import { POSE_CONNECTIONS } from '@mediapipe/pose';
 import { getEyeLine } from '../utils/postureDetect';
+import { Landmark, Landmarks } from '../utils/poseMath';
+
+// Define pose connections for drawing
+const POSE_CONNECTIONS = [
+  // Face connections
+  [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
+  // Torso connections
+  [9, 10], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
+  // Legs
+  [11, 23], [12, 24], [23, 25], [24, 26], [25, 27], [26, 28], [27, 29], [28, 30], [29, 31], [30, 32],
+  // Arms
+  [11, 13], [13, 15], [15, 17], [17, 19], [19, 21],
+  [12, 14], [14, 16], [16, 18], [18, 20], [20, 22]
+];
 
 interface PostureViewProps {
   isSessionActive?: boolean;
@@ -33,6 +45,54 @@ export const PostureView = ({
       visVideo.current.play();
     }
   }, [stream]);
+
+  // Custom draw functions
+  const drawConnectors = (
+    ctx: CanvasRenderingContext2D, 
+    landmarks: Landmarks, 
+    connections: number[][], 
+    options: { color: string, lineWidth: number }
+  ) => {
+    const { color, lineWidth } = options;
+    
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    
+    for (const connection of connections) {
+      const [start, end] = connection;
+      if (landmarks[start] && landmarks[end]) {
+        const startPt = landmarks[start];
+        const endPt = landmarks[end];
+        
+        ctx.beginPath();
+        ctx.moveTo(startPt.x * ctx.canvas.width, startPt.y * ctx.canvas.height);
+        ctx.lineTo(endPt.x * ctx.canvas.width, endPt.y * ctx.canvas.height);
+        ctx.stroke();
+      }
+    }
+  };
+  
+  const drawLandmarks = (
+    ctx: CanvasRenderingContext2D, 
+    landmarks: Landmarks, 
+    options: { color: string, fillColor: string, radius: number }
+  ) => {
+    const { color, fillColor, radius } = options;
+    
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    
+    for (const landmark of landmarks) {
+      const x = landmark.x * ctx.canvas.width;
+      const y = landmark.y * ctx.canvas.height;
+      
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    }
+  };
 
   // enlarge by 30%
   useEffect(() => {
