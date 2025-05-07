@@ -3,27 +3,16 @@ import { NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { usePosture } from "@/context/PostureContext";
 import { POSE_LANDMARKS } from "@/utils/postureDetect";
 
-// Define pose connections for skeleton visualization - Commented out as per request
+// Connection lines commented out as per request
 /*
 const POSE_CONNECTIONS: [number, number][] = [
-  // Face connections
-  [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
-  // Torso connections
-  [9, 10], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
-  // Legs
-  [11, 23], [12, 24], [23, 25], [24, 26], [25, 27], [26, 28], [27, 29], [28, 30], [29, 31], [30, 32],
-  // Arms
-  [11, 13], [13, 15], [15, 17], [17, 19], [19, 21],
-  [12, 14], [14, 16], [16, 18], [18, 20], [20, 22]
+  // ... (connections were here)
 ];
 */
 
-interface CanvasOverlayProps {
-  videoElement: HTMLVideoElement | null;
-  landmarks?: NormalizedLandmark[];
-  baselinePose?: NormalizedLandmark[];
-  isGoodPosture: boolean;
-  isCalibrated: boolean;
+export interface PostureViewProps {
+  isSessionActive?: boolean;
+  onPostureChange?: (isGood: boolean) => void;
 }
 
 const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
@@ -44,74 +33,41 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
     if (!ctx) return;
 
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-        canvas.width = video.clientWidth;
-        canvas.height = video.clientHeight;
+        // Use clientWidth/Height for displayed size if available and non-zero, otherwise fall back to videoWidth/Height
+        const displayWidth = video.clientWidth > 0 ? video.clientWidth : video.videoWidth;
+        const displayHeight = video.clientHeight > 0 ? video.clientHeight : video.videoHeight;
+        
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+        console.log(`CanvasOverlay: video naturalW=${video.videoWidth}, naturalH=${video.videoHeight}, clientW=${video.clientWidth}, clientH=${video.clientHeight}. Set canvas size to w=${canvas.width}, h=${canvas.height}`);
     } else {
+        // Video dimensions not ready
         return;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw horizontal bar for posture baseline if calibrated
     if (isCalibrated && baselinePose && baselinePose.length > 0 && baselinePose[POSE_LANDMARKS.NOSE]) {
       const baselineNoseLandmark = baselinePose[POSE_LANDMARKS.NOSE];
-      // Ensure baselineNoseLandmark exists and has y property (belt-and-suspenders check)
       if (baselineNoseLandmark && typeof baselineNoseLandmark.y === 'number') { 
         const barHeight = 10; 
         const barY = baselineNoseLandmark.y * canvas.height;
-        
-        ctx.fillStyle = isGoodPosture 
-          ? "rgba(0, 255, 0, 0.5)" 
-          : "rgba(255, 0, 0, 0.5)";
-        
+        ctx.fillStyle = isGoodPosture ? "rgba(0, 255, 0, 0.5)" : "rgba(255, 0, 0, 0.5)";
         ctx.fillRect(0, barY - barHeight / 2, canvas.width, barHeight);
       }
     }
 
-    // Draw current landmarks if available
     if (landmarks && landmarks.length > 0) {
       ctx.save();
-    
-      // Landmark Connection Lines - Commented out as per request
-      /*
-      if (POSE_CONNECTIONS) { 
-        ctx.strokeStyle = isGoodPosture ? "green" : "red";
-        ctx.lineWidth = 2;
-        POSE_CONNECTIONS.forEach((connection: [number, number]) => {
-          const startLandmark = landmarks[connection[0]];
-          const endLandmark = landmarks[connection[1]];
-          if (startLandmark && endLandmark && startLandmark.visibility && startLandmark.visibility > 0.5 && endLandmark.visibility && endLandmark.visibility > 0.5) {
-            ctx.beginPath();
-            ctx.moveTo((1 - startLandmark.x) * canvas.width, startLandmark.y * canvas.height);
-            ctx.lineTo((1 - endLandmark.x) * canvas.width, endLandmark.y * canvas.height);
-            ctx.stroke();
-          }
-        });
-      }
-      */
-
-      // Draw current landmark dots
+      // POSE_CONNECTIONS drawing block fully removed/commented out here
       landmarks.forEach((landmark) => {
         if (landmark && landmark.visibility && landmark.visibility > 0.5 && typeof landmark.x === 'number' && typeof landmark.y === 'number') {
           ctx.beginPath();
-          ctx.arc(
-            (1 - landmark.x) * canvas.width, // Mirrored X coordinate
-            landmark.y * canvas.height,
-            3, // Dot size
-            0,
-            2 * Math.PI
-          );
+          ctx.arc((1 - landmark.x) * canvas.width, landmark.y * canvas.height, 3, 0, 2 * Math.PI);
           ctx.fillStyle = isGoodPosture ? "lightgreen" : "pink";
           ctx.fill();
         }
       });
-
-      // Baseline Pose Dots - Commented out as the bar is the primary indicator
-      /*
-      if (isCalibrated && baselinePose && baselinePose.length > 0) {
-        // ... (code for drawing blue baseline dots and connections was here)
-      }
-      */
       ctx.restore(); 
     }
   }, [videoElement, landmarks, baselinePose, isGoodPosture, isCalibrated]);
@@ -123,13 +79,21 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
         position: "absolute",
         left: videoElement?.offsetLeft ?? 0,
         top: videoElement?.offsetTop ?? 0,
-        zIndex: 10, 
+        zIndex: 10,
       }}
     />
   );
 };
 
-export const PostureView: React.FC = () => {
+interface CanvasOverlayProps { // Moved interface definition here to be used by CanvasOverlay 
+    videoElement: HTMLVideoElement | null;
+    landmarks?: NormalizedLandmark[];
+    baselinePose?: NormalizedLandmark[];
+    isGoodPosture: boolean;
+    isCalibrated: boolean;
+}
+
+export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPostureChange }) => {
   const {
     videoRef,
     detectedLandmarks,
@@ -144,17 +108,11 @@ export const PostureView: React.FC = () => {
     cameraError
   } = usePosture();
 
-  // eyeLineRef is not used anymore, can be removed if not planned for other features
-  // const eyeLineRef = useRef<number | null>(null); 
-  
-  // useEffect(() => {
-  //   if (detectedLandmarks && detectedLandmarks.length > 0 && !eyeLineRef.current) {
-  //     const noseLandmark = detectedLandmarks[POSE_LANDMARKS.NOSE];
-  //     if (noseLandmark) { 
-  //       // eyeLineRef.current = getEyeLine(detectedLandmarks); // Original eye line
-  //     }
-  //   }
-  // }, [detectedLandmarks]);
+  useEffect(() => {
+    if (isSessionActive && onPostureChange) {
+      onPostureChange(postureStatus.isGood);
+    }
+  }, [postureStatus.isGood, isSessionActive, onPostureChange]);
 
   useEffect(() => {
     if (!isDetecting && !isLoadingDetector && !cameraError) { 
@@ -179,7 +137,7 @@ export const PostureView: React.FC = () => {
         </div>
       </div>
       
-      <div className="relative" style={{ minHeight: '480px' }}>
+      <div className="relative w-full aspect-[4/3]" style={{ minHeight: '240px' /* Fallback min height */ }}> {/* Added aspect ratio and full width for video container */}
         {isLoadingDetector && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20">
             <div className="text-white text-lg">Loading posture detector...</div>
@@ -197,13 +155,12 @@ export const PostureView: React.FC = () => {
 
         <video
           ref={videoRef}
-          width="640"
-          height="480"
+          // Removed fixed width/height, relying on CSS via className="w-full h-full ..."
           autoPlay
-          playsInline
-          muted
-          style={{ transform: "scaleX(-1)" }} // Mirrored view
-          className="w-full h-full object-cover rounded"
+          playsInline 
+          muted 
+          style={{ transform: "scaleX(-1)" }} 
+          className="w-full h-full object-cover rounded" // Ensure video fills container
         />
         
         {videoRef.current && detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
