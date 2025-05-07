@@ -137,9 +137,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
 
+      console.log("Posture detection starting loop.");
+      // Ensure detection state is active before starting loop
       setIsDetecting(true);
       setIsLoadingDetector(false);
-      console.log("Posture detection starting loop.");
 
       const detectLoop = () => {
         if (!isDetecting || !videoRef.current || videoRef.current.paused || videoRef.current.ended) {
