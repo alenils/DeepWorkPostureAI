@@ -1,4 +1,4 @@
-import { POSE_LANDMARKS } from '@mediapipe/pose';
+import { POSE_LANDMARKS } from '../lib/poseConstants';
 import { 
   Landmark, 
   Landmarks, 
