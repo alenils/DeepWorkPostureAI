@@ -31,6 +31,7 @@ interface PostureContextType {
   isCalibrated: boolean;
   setIsCalibrated: React.Dispatch<React.SetStateAction<boolean>>;
   isLoadingDetector: boolean;
+  calibrationCount: number; // For forcing callback refresh
 }
 
 const PostureContext = createContext<PostureContextType | undefined>(undefined);
@@ -55,34 +56,74 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLoadingDetector, setIsLoadingDetector] = useState(false);
   const animationFrameId = useRef<number | null>(null);
   const detectingRef = useRef<boolean>(false); // Ref to track detection across closures
+  const [calibrationCount, setCalibrationCount] = useState(0); // Calibration counter
+
+  const handleCalibration = () => {
+    if (detectedLandmarks && detectedLandmarks.length > 0) {
+      console.log("CONTEXT: Starting calibration process...");
+      setPostureStatus({ isGood: true, message: "Calibrating... Hold still!" }); // Immediate feedback
+      setIsCalibrated(false); // Ensure we are in 'calibrating' mode
+
+      setTimeout(() => {
+        // Re-read landmarks *after* the delay.
+        // Accessing detectedLandmarks directly from state here is generally fine in a timeout started after it's checked.
+        const currentDetectedLandmarks = detectedLandmarksRef.current; // Use a ref for the most current landmarks
+
+        if (currentDetectedLandmarks && currentDetectedLandmarks.length > 0) { 
+          console.log("CONTEXT: Capturing baseline after delay with current landmarks:", currentDetectedLandmarks);
+          const currentBaseline = currentDetectedLandmarks.map(lm => ({ ...lm }));
+          setBaselinePose(currentBaseline);
+          setIsCalibrated(true); // NOW set calibrated to true
+          setCalibrationCount(prevCount => prevCount + 1); // Increment counter
+          
+          const status = isGoodPosture(currentDetectedLandmarks, currentBaseline); 
+          setPostureStatus(status);
+          console.log("CONTEXT: Calibration complete. isCalibrated=true. Status:", status);
+        } else {
+          console.warn("CONTEXT: No landmarks detected after calibration delay. Landmarks ref:", currentDetectedLandmarks);
+          setPostureStatus({ isGood: false, message: "Calibration failed: landmarks lost." });
+          setIsCalibrated(false); // Stay uncalibrated
+        }
+      }, 3000); // 3-second delay
+
+    } else {
+      console.warn("CONTEXT: Calibration attempt failed: No landmarks detected at start of calibration.");
+      setPostureStatus({ isGood: false, message: "Cannot calibrate - no landmarks detected yet." });
+    }
+  };
+
+  const detectedLandmarksRef = useRef(detectedLandmarks);
+  useEffect(() => {
+    detectedLandmarksRef.current = detectedLandmarks;
+  }, [detectedLandmarks]);
 
   const handlePoseResults = useCallback(
-    (result: PoseLandmarkerResult, timestampMs: number) => { 
-      // console.log("PostureContext: handlePoseResults called. Result:", result, "Timestamp:", timestampMs); // Verbose
+    (result: PoseLandmarkerResult, timestampMs: number) => {
       if (result.landmarks && result.landmarks.length > 0) {
-        const currentLandmarks = result.landmarks[0]; // Assuming numPoses = 1
-        setDetectedLandmarks(currentLandmarks);
+        const currentLandmarks = result.landmarks[0];
+        setDetectedLandmarks(currentLandmarks); 
 
         if (isCalibrated && baselinePose) {
-          const baselineNoseY = baselinePose[POSE_LANDMARKS.NOSE]?.y;
-          console.log(`CONTEXT: Judging with calibration. isCalibrated: ${isCalibrated}, BaselineNoseY: ${baselineNoseY?.toFixed(3)}`);
           const status = isGoodPosture(currentLandmarks, baselinePose);
-          setPostureStatus(status);
-        } else {
-          console.log(`CONTEXT: Not yet calibrated or baseline missing. isCalibrated: ${isCalibrated}, baselinePose defined: ${!!baselinePose}`);
-          const preCalibrationStatus = isGoodPosture(currentLandmarks, null); 
-          setPostureStatus({isGood: preCalibrationStatus.isGood, message: "Ready to calibrate."});
+          setPostureStatus(status); 
+        } else { 
+          if (postureStatus.message !== "Calibrating... Hold still!") {
+             const preCalibrationStatus = isGoodPosture(currentLandmarks, null);
+             // Check detectedLandmarks from state directly for this message, as currentLandmarks is definitely present here.
+             const message = currentLandmarks && currentLandmarks.length > 0 ? "Ready to calibrate." : "Initializing detector...";
+             setPostureStatus({isGood: preCalibrationStatus.isGood, message: message});
+          }
         }
       } else {
-        setDetectedLandmarks(undefined);
-        if (isCalibrated) {
-            setPostureStatus({ isGood: false, message: "No person detected." });
-        } else {
-            setPostureStatus({ isGood: true, message: "No person detected. Waiting for tracking..." });
-        }
+         setDetectedLandmarks(undefined);
+         if (isCalibrated) { 
+             setPostureStatus({ isGood: false, message: "No person detected." });
+         } else if (postureStatus.message !== "Calibrating... Hold still!") {
+             setPostureStatus({ isGood: true, message: "Initializing detector..." });
+         }
       }
     },
-    [isCalibrated, baselinePose, POSE_LANDMARKS] 
+    [isCalibrated, baselinePose, calibrationCount, postureStatus.message, POSE_LANDMARKS] 
   );
   
   const setupPoseDetector = useCallback(async () => {
@@ -103,7 +144,6 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [handlePoseResults]);
 
-
   const startPostureDetection = async () => {
     if (!videoRef.current) {
       setCameraError("Video element not available.");
@@ -117,8 +157,8 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         video: { width: 640, height: 480 }, 
       });
       videoRef.current.srcObject = stream;
-      await new Promise((resolve) => { 
-        if (videoRef.current) videoRef.current.onloadedmetadata = resolve;
+      await new Promise<void>((resolve) => { 
+        if (videoRef.current) videoRef.current.onloadedmetadata = () => resolve();
       });
       await videoRef.current.play();
       console.log("Camera stream started.");
@@ -142,7 +182,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
           if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
           return;
         }
-        if (videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        if (videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && videoRef.current.videoWidth > 0) {
           const now = performance.now();
           poseDetector.detect(videoRef.current, now);
         }
@@ -177,22 +217,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log("Camera stream stopped.");
     }
     setDetectedLandmarks(undefined);
-    setPostureStatus({ isGood: true, message: "Detection stopped." });
-  };
-
-  const handleCalibration = () => {
-    if (detectedLandmarks && detectedLandmarks.length > 0) {
-      const currentBaseline = detectedLandmarks.map(lm => ({ ...lm }));
-      setBaselinePose(currentBaseline);
-      setIsCalibrated(true);
-      const currentLandmarks = detectedLandmarks; // Use existing checked variable
-      const status = isGoodPosture(currentLandmarks, currentBaseline); 
-      setPostureStatus(status); 
-      console.log("CONTEXT: Calibration successful. Initial status after calibration:", status);
-    } else {
-      setPostureStatus({ isGood: false, message: "Cannot calibrate - no landmarks detected yet. Ensure you are visible." });
-      console.warn("Calibration attempt failed: No landmarks detected.");
-    }
+    // setPostureStatus({ isGood: true, message: "Detection stopped." }); // Keep current status unless explicitly reset
   };
   
   useEffect(() => {
@@ -200,10 +225,6 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         setupPoseDetector();
     }
   }, [setupPoseDetector, isLoadingDetector]); 
-
-  useEffect(() => {
-    // console.log("PostureContext: detectedLandmarks state updated:", detectedLandmarks); // Verbose
-  }, [detectedLandmarks]);
 
   useEffect(() => {
     return () => { 
@@ -231,6 +252,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         isCalibrated,
         setIsCalibrated,
         isLoadingDetector,
+        calibrationCount,
       }}
     >
       {children}

@@ -121,7 +121,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
   }, [isDetecting, isLoadingDetector, startPostureDetection, cameraError]);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden w-full">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden w-full max-w-[640px] mx-auto">
       <div className="p-4 pb-2 flex justify-between items-center">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
           🎥 Posture Tracker
@@ -129,15 +129,15 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         <div className="flex space-x-2">
           <button 
             onClick={handleCalibration} 
-            disabled={!detectedLandmarks || detectedLandmarks.length === 0 || isLoadingDetector || !!cameraError}
+            disabled={!detectedLandmarks || detectedLandmarks.length === 0 || isLoadingDetector || !!cameraError || postureStatus.message === "Calibrating... Hold still!"}
             className="bg-gray-700/80 hover:bg-gray-600 text-white px-3 py-1 rounded font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Calibrate
+            {postureStatus.message === "Calibrating... Hold still!" ? "Calibrating..." : "Calibrate"}
           </button>
         </div>
       </div>
       
-      <div className="relative w-full aspect-[4/3]" style={{ minHeight: '240px' /* Fallback min height */ }}> {/* Added aspect ratio and full width for video container */}
+      <div className="relative" style={{ minHeight: '240px' }}>
         {isLoadingDetector && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20">
             <div className="text-white text-lg">Loading posture detector...</div>
@@ -155,12 +155,13 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
 
         <video
           ref={videoRef}
-          // Removed fixed width/height, relying on CSS via className="w-full h-full ..."
+          width="640"
+          height="480"
           autoPlay
           playsInline 
           muted 
           style={{ transform: "scaleX(-1)" }} 
-          className="w-full h-full object-cover rounded" // Ensure video fills container
+          className="object-cover rounded block mx-auto"
         />
         
         {videoRef.current && detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
