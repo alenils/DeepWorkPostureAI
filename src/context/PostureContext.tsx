@@ -49,10 +49,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   });
   const [isCalibrated, setIsCalibrated] = useState(false);
   const [isLoadingDetector, setIsLoadingDetector] = useState(false);
-  const animationFrameId = useRef<number | null>(null);
-  const detectingRef = useRef<boolean>(false); // Ref to track detection across closures
+  const intervalIdRef = useRef<number | null>(null);
+  const detectingRef = useRef<boolean>(false);
 
-  // Refs for state values to be accessed in the poseDetector callback
+  // Refs for state values
   const isCalibratedRef = useRef(isCalibrated);
   const baselinePoseRef = useRef(baselinePose);
   const detectedLandmarksRef = useRef(detectedLandmarks);
@@ -199,24 +199,29 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
           throw new Error("Pose detector could not be initialized after attempt.");
       }
 
-      console.log("Posture detection starting loop.");
+      console.log("CONTEXT: Posture detection starting interval.");
       setIsDetecting(true);
-      detectingRef.current = true; 
+      detectingRef.current = true;
       setIsLoadingDetector(false);
 
-      const detectLoop = () => {
-        if (!detectingRef.current || !videoRef.current || !videoRef.current.srcObject || videoRef.current.paused || videoRef.current.ended) {
-          if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
-          animationFrameId.current = null;
-          return;
-        }
-        if (videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && videoRef.current.videoWidth > 0) {
+      // Clear any existing interval first
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+      }
+
+      // Start the new interval
+      intervalIdRef.current = setInterval(() => {
+        // Check if still detecting and video is ready
+        if (detectingRef.current && videoRef.current && videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && videoRef.current.videoWidth > 0) {
           const now = performance.now();
           poseDetector.detect(videoRef.current, now);
+        } else if (!detectingRef.current) {
+             // Interval is running, but detection was stopped elsewhere. Clear interval.
+             console.log("INTERVAL: detectingRef is false, clearing interval from within.")
+             if (intervalIdRef.current) clearInterval(intervalIdRef.current);
+             intervalIdRef.current = null;
         }
-        animationFrameId.current = requestAnimationFrame(detectLoop);
-      };
-      detectLoop();
+      }, 2000); // Run every 2000ms (2 seconds)
 
     } catch (err) {
       console.error("Error starting posture detection:", err);
@@ -226,18 +231,28 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         }`
       );
       setIsDetecting(false);
+      detectingRef.current = false;
       setIsLoadingDetector(false);
+      // Clear interval on error too
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
     }
   };
 
   const stopPostureDetection = () => {
-    console.log("Stopping posture detection.");
-    detectingRef.current = false; 
+    console.log("CONTEXT: Stopping posture detection.");
+    detectingRef.current = false;
     setIsDetecting(false);
-    if (animationFrameId.current) {
-      cancelAnimationFrame(animationFrameId.current);
-      animationFrameId.current = null;
+
+    // Clear the interval timer
+    if (intervalIdRef.current) { 
+      clearInterval(intervalIdRef.current);
+      intervalIdRef.current = null;
+      console.log("CONTEXT: Detection interval cleared.");
     }
+    
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach((track) => track.stop());
@@ -255,10 +270,19 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     return () => { 
-      stopPostureDetection();
+      console.log("CONTEXT: PostureProvider unmounting or dependencies changed. Cleaning up...");
+      // Clear detection interval on unmount
+      if (intervalIdRef.current) {
+        console.log("CONTEXT: Clearing interval timer during cleanup.");
+        clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
+      // Stop detection logic (stops camera tracks etc.)
+      stopPostureDetection(); 
+      // Close the pose detector instance
       if (poseDetector && typeof poseDetector.close === 'function') {
           poseDetector.close(); 
-          console.log("PostureProvider unmounted, detector closed.");
+          console.log("CONTEXT: Pose detector closed during cleanup.");
       }
     };
   }, []);
