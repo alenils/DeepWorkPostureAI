@@ -31,7 +31,7 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   // Load songs using import.meta.glob
   useEffect(() => {
     try {
-      const songModules = import.meta.glob('/public/sounds/*.mp3', { eager: true });
+      const songModules = import.meta.glob('/sounds/*.mp3?url', { eager: true });
       const songPaths = Object.keys(songModules)
         .filter(path => !path.includes('start.mp3') && 
                         !path.includes('pause.mp3') && 

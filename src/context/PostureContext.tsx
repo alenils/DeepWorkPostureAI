@@ -3,6 +3,8 @@ import { detectPostureWithBaseline } from '../utils/postureDetect';
 import { Landmarks } from '../utils/poseMath';
 import { loadDetector, detectPose } from '../utils/poseDetector';
 import { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import { Camera } from '@mediapipe/camera_utils';
+import { loadPose, PoseResult } from '@/lib/poseDetector';
 
 // Define NormalizedLandmark type to match MediaPipe's format
 interface NormalizedLandmark {
@@ -98,12 +100,26 @@ export const PostureProvider: React.FC<{children: React.ReactNode}> = ({children
         
         // Load pose detector
         console.log("Loading pose detector...");
-        const detector = await loadDetector();
-        detectorRef.current = detector;
+        const pose = await loadPose();
+        detectorRef.current = pose;
         console.log("Pose detector loaded");
         
         // Start detection loop
         rafRef.current = requestAnimationFrame(detectPoseFrame);
+
+        const cam = new Camera(video, {
+          width: 640,
+          height: 480,
+          onFrame: async () => {
+            const res: PoseResult = pose.detectForVideo(video, Date.now());
+            if (res.landmarks.length) {
+              const lm = res.landmarks[0];     // array of 33  {x,y,z}
+              latestRef.current = lm;
+              setLM(lm as any);                // Landmarks type alias
+            }
+          }
+        });
+        cam.start().then(() => console.log('[Posture] camera started'));
       } catch (error) {
         console.error("Error setting up camera:", error);
       }

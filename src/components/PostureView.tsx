@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { usePosture } from '../context/PostureContext';
 import { getEyeLine } from '../utils/postureDetect';
 import { Landmark, Landmarks } from '../utils/poseMath';
+import { POSE_CONNECTIONS as POSE_CONNECTIONS_LIST } from '../lib/poseConstants';
 
 // Define pose connections for drawing
 const POSE_CONNECTIONS = [
@@ -135,6 +136,40 @@ export const PostureView = ({
     }
     calibrate(); // Also call the original calibrate from context
   };
+
+  useEffect(() => {
+    if (!landmarks) return;
+    const ctx = canvasRef.current!.getContext('2d')!;
+    ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+    
+    // Draw connections
+    POSE_CONNECTIONS_LIST.forEach(([start, end]) => {
+      const startPoint = landmarks[start];
+      const endPoint = landmarks[end];
+      if (startPoint && endPoint) {
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x * canvasRef.current!.width, startPoint.y * canvasRef.current!.height);
+        ctx.lineTo(endPoint.x * canvasRef.current!.width, endPoint.y * canvasRef.current!.height);
+        ctx.strokeStyle = '#0af';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    });
+
+    // Draw landmarks
+    landmarks.forEach(landmark => {
+      ctx.beginPath();
+      ctx.arc(
+        landmark.x * canvasRef.current!.width,
+        landmark.y * canvasRef.current!.height,
+        2,
+        0,
+        2 * Math.PI
+      );
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    });
+  }, [landmarks]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden w-full lg:w-[125%] lg:-mr-[25%]">
