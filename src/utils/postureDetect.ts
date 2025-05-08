@@ -65,11 +65,11 @@ export function isGoodPosture(
   baselineMetrics: BaselineMetrics | null | undefined // Changed type here
 ): { isGood: boolean; message: string } {
 
-  // --- Reference App Thresholds (Keep these fixed) ---
-  const Y_NOSE_THRESHOLD = 0.08;          // Relaxed ref value
-  const X_NOSE_THRESHOLD = 0.08;          // Relaxed ref value
-  const Y_EAR_TILT_THRESHOLD = 0.04;       // Relaxed ref value
-  const EAR_SHOULDER_DIST_THRESHOLD = 0.05; // Relaxed lean check
+  // --- Reference App Thresholds (Reverted) ---
+  const Y_NOSE_THRESHOLD = 0.06; 
+  const X_NOSE_THRESHOLD = 0.06;
+  const Y_EAR_TILT_THRESHOLD = 0.03; 
+  // EAR_SHOULDER_DIST_THRESHOLD is removed as lean check is commented out
   // ---
 
   // Check for required landmarks (Nose, Ears, Shoulders for lean check)
@@ -120,7 +120,8 @@ export function isGoodPosture(
     return { isGood: false, message: "Head tilted!" }; 
   }
       
-  // 4. Forward/Backward Lean Check (Change in Ear-Shoulder Horizontal Distance)
+  /* // Temporarily COMMENT OUT Lean Check
+  const EAR_SHOULDER_DIST_THRESHOLD = 0.05; // Value from previous step, now ignored
   const currentEarShoulderDistX = Math.abs(leftEar.x - leftShoulder.x); 
   if (typeof baselineMetrics.earShoulderDistX === 'number') { 
       if (Math.abs(currentEarShoulderDistX - baselineMetrics.earShoulderDistX) > EAR_SHOULDER_DIST_THRESHOLD) {
@@ -131,9 +132,10 @@ export function isGoodPosture(
   } else {
        console.warn("POSTURE CHECK: Missing baseline earShoulderDistX for lean check.");
   }
+  */
 
-  // If all checks pass
-  console.log("POSTURE CHECK: Result -> GOOD");
+  // If Nose X/Y and Ear Tilt checks pass
+  console.log("POSTURE CHECK: Result -> GOOD (Reference Logic - No Lean Check)");
   return { isGood: true, message: "Posture OK!" };
 }
 

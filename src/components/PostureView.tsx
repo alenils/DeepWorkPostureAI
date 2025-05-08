@@ -196,11 +196,12 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           style={{ 
             transform: "scaleX(-1)", 
             display: 'block',
-            width: '100%',   
-            height: '100%',  
-            objectFit: 'cover !important' as any
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: 'auto',
+            height: 'auto',
+            margin: 'auto'
           }} 
-          className="rounded"
         />
         
         {videoRef.current && detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
