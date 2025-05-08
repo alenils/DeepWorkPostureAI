@@ -18,24 +18,25 @@ const songsData: Song[] = [
   {
     title: 'Lofi Chill',
     artist: 'Studio Beats',
-    src: '/music/lofi-chill.mp3', // Assumes music is in public/music/
-    duration: 150, // Example duration
+    src: '/sounds/lofi-chill.mp3', // PATH RELATIVE TO PUBLIC FOLDER
+    duration: 150, 
   },
   {
     title: 'Ambient Calm',
     artist: 'Relax Sounds',
-    src: '/music/ambient-calm.mp3', // Assumes music is in public/music/
+    src: '/sounds/ambient-calm.mp3', // PATH RELATIVE TO PUBLIC FOLDER
     duration: 210, 
   },
   {
     title: 'Study Flow',
     artist: 'Focus Tracks',
-    src: '/music/study-flow.mp3', // Assumes music is in public/music/
+    src: '/sounds/study-flow.mp3', // PATH RELATIVE TO PUBLIC FOLDER
     duration: 185,
   },
+  // Add your actual songs here with correct paths like '/sounds/your-song.mp3'
 ];
 
-export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
+const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive = false }) => {
   const currentAudioRef = useRef<HTMLAudioElement>(null);
   const nextAudioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -61,6 +62,7 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   const prevIsSessionActiveRef = useRef(isSessionActive);
   // const [showPlayer, setShowPlayer] = useState(false); // This state was unused, commenting out
   
+  console.log("MusicPlayer Render: songsData.length =", songsData.length); // Check this log
   // REMOVE useEffect hook that loads songs dynamically
   // useEffect(() => { ... import.meta.glob ... setSongs ... }, []);
 
@@ -661,4 +663,6 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
       )}
     </div>
   );
-}; 
+};
+
+export { MusicPlayer }; 

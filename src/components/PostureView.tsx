@@ -172,7 +172,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         </div>
       </div>
       
-      <div className="relative mx-auto bg-black" style={{ width: '640px', height: '480px' }}>
+      <div className="relative mx-auto bg-gray-700" style={{ width: '640px', height: '480px', overflow: 'hidden' }}>
         {isLoadingDetector && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20">
             <div className="text-white text-lg">Loading posture detector...</div>
@@ -193,7 +193,8 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           autoPlay
           playsInline 
           muted 
-          className="block w-full h-full object-contain rounded"
+          style={{ transform: 'scaleX(-1)', display: 'block', width: '100%', height: '100%' }}
+          className=""
         />
         
         {videoRef.current && detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
@@ -210,7 +211,9 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           <div className="absolute top-2 right-2 p-1 px-2 rounded bg-black/60 text-white text-xs font-medium z-10">
             {isCalibrating && countdown !== null ? 
               <span>Calibrating... {countdown}</span> : 
-              <span>{postureStatus.isGood ? '✅ Good' : '❌ Bad'} | {postureStatus.message}</span>
+              <span>
+                {postureStatus.isGood ? '✅ Good' : '❌ Bad'} | {postureStatus.message}
+              </span>
             }
           </div>
         )}

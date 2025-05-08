@@ -284,13 +284,11 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
     detectingRef.current = false;
     setIsDetecting(false);
 
-    // Clear detection interval
     if (intervalIdRef.current) { 
       clearInterval(intervalIdRef.current);
       intervalIdRef.current = null;
       console.log("CONTEXT: Detection interval cleared.");
     }
-    // Clear calibration timer if active
     if (calibrationTimerRef.current) { 
       clearInterval(calibrationTimerRef.current);
       calibrationTimerRef.current = null;
@@ -305,7 +303,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       videoRef.current.srcObject = null;
       console.log("CONTEXT: Camera stream stopped and srcObject cleared.");
+    } else {
+      console.log("CONTEXT: No active stream found to stop.");
     }
+
     setDetectedLandmarks(undefined);
     setIsCalibrated(false); 
     setBaselineMetrics(null);
