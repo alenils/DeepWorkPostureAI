@@ -299,9 +299,12 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
     
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((track) => {
+          console.log("Stopping track:", track.kind, track.label);
+          track.stop(); 
+      });
       videoRef.current.srcObject = null;
-      console.log("Camera stream stopped.");
+      console.log("CONTEXT: Camera stream stopped and srcObject cleared.");
     }
     setDetectedLandmarks(undefined);
     setIsCalibrated(false); 

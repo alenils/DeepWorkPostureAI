@@ -44,9 +44,11 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const [songs, setSongs] = useState<string[]>([]);
+  
+  // Initialize directly with songsData
+  const [songs, setSongs] = useState<Song[]>(songsData);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
-  const [nextSongIndex, setNextSongIndex] = useState(1);
+  const [nextSongIndex, setNextSongIndex] = useState(songsData.length > 1 ? 1 : 0); // Initialize nextSongIndex based on songsData
   const [isPlaying, setIsPlaying] = useState(false);
   const [songName, setSongName] = useState('');
   const [isCrossFading, setIsCrossFading] = useState(false);
@@ -57,71 +59,56 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   const [playInSession, setPlayInSession] = useState(false);
   const fadeIntervalRef = useRef<number | null>(null);
   const prevIsSessionActiveRef = useRef(isSessionActive);
-  const [showPlayer, setShowPlayer] = useState(false);
+  // const [showPlayer, setShowPlayer] = useState(false); // This state was unused, commenting out
   
-  // Load songs using import.meta.glob
-  useEffect(() => {
-    try {
-      const songModules = import.meta.glob('/sounds/*.mp3?url', { eager: true });
-      const songPaths = Object.keys(songModules)
-        .filter(path => !path.includes('start.mp3') && 
-                        !path.includes('pause.mp3') && 
-                        !path.includes('done.mp3') && 
-                        !path.includes('check.mp3') && 
-                        !path.includes('cancel.mp3') &&
-                        !path.includes('distraction.mp3'))
-        .map(path => path.replace('/public', ''))
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-      
-      setSongs(songPaths);
-      console.log('Loaded songs:', songPaths);
-    } catch (error) {
-      console.error('Failed to load songs:', error);
-      setSongs([]);
-    }
-  }, []);
+  // REMOVE useEffect hook that loads songs dynamically
+  // useEffect(() => { ... import.meta.glob ... setSongs ... }, []);
 
   // Initialize next song index and load last played song and preferences from localStorage
   useEffect(() => {
     if (songs.length > 0) {
-      const savedIndex = localStorage.getItem('lastSongIndex');
-      if (savedIndex !== null && parseInt(savedIndex, 10) < songs.length) {
-        const currentIdx = parseInt(savedIndex, 10);
-        setCurrentSongIndex(currentIdx);
-        setNextSongIndex((currentIdx + 1) % songs.length);
+      const savedIndexStr = localStorage.getItem('lastSongIndex');
+      if (savedIndexStr !== null) {
+        const savedIndex = parseInt(savedIndexStr, 10);
+        if (savedIndex >= 0 && savedIndex < songs.length) {
+            setCurrentSongIndex(savedIndex);
+            setNextSongIndex((savedIndex + 1) % songs.length);
+        } else {
+            // Invalid index, default to 0
+            setCurrentSongIndex(0);
+            setNextSongIndex(songs.length > 1 ? 1 : 0);
+        }
       } else {
+        // No saved index, default based on initial state
+        setCurrentSongIndex(0);
         setNextSongIndex(songs.length > 1 ? 1 : 0);
       }
       
-      // Load loop preference
       const loopPreference = localStorage.getItem('flowLoop');
       if (loopPreference !== null) {
         setIsLoopEnabled(loopPreference === 'true');
       }
       
-      // Load session play preference
       const sessionPlayPreference = localStorage.getItem('playInSession');
       if (sessionPlayPreference !== null) {
         setPlayInSession(sessionPlayPreference === 'true');
       }
+    } else {
+        // Handle case where songsData might initially be empty or not loaded as expected
+        setCurrentSongIndex(0);
+        setNextSongIndex(0);
+        setSongName("No songs available");
     }
-  }, [songs]);
+  }, [songs.length]); // Depend on songs.length to re-run if songsData changes (e.g. during dev)
 
   // Extract and format song name from path
   useEffect(() => {
-    if (songs.length > 0) {
-      const path = songs[currentSongIndex];
-      const fileName = path.split('/').pop() || '';
-      // Remove extension and replace underscores and %20 with spaces
-      const name = fileName
-        .replace(/\.[^/.]+$/, '')
-        .replace(/_/g, ' ')
-        .replace(/%20/g, ' ');
-      
-      setSongName(name);
-      
-      // Save current index to localStorage
+    if (songs.length > 0 && songs[currentSongIndex]) {
+      // Use title and artist from the Song object
+      setSongName(`${songs[currentSongIndex].title} - ${songs[currentSongIndex].artist}`);
       localStorage.setItem('lastSongIndex', currentSongIndex.toString());
+    } else if (songs.length === 0) {
+      setSongName("No songs loaded");
     }
   }, [currentSongIndex, songs]);
 
@@ -649,11 +636,11 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
       </div>
 
       {/* Hidden audio elements for cross-fade */}
-      {songs.length > 0 && (
+      {songs.length > 0 && songs[currentSongIndex] && ( // Ensure songs[currentSongIndex] exists
         <>
           <audio
             ref={currentAudioRef}
-            src={songs[currentSongIndex]}
+            src={songs[currentSongIndex].src} // Use .src from Song object
             preload="auto"
             onEnded={handleAudioEnded}
             onLoadedMetadata={() => {
@@ -662,10 +649,11 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
               }
             }}
           />
-          {songs.length > 1 && (
+          {/* Ensure songs[nextSongIndex] exists before rendering nextAudio */}
+          {songs.length > 1 && songs[nextSongIndex] && (
             <audio
               ref={nextAudioRef}
-              src={songs[nextSongIndex]}
+              src={songs[nextSongIndex].src} // Use .src from Song object
               preload="auto"
             />
           )}
