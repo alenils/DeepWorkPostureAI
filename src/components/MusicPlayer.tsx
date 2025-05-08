@@ -62,7 +62,7 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
   const prevIsSessionActiveRef = useRef(isSessionActive);
   // const [showPlayer, setShowPlayer] = useState(false); // This state was unused, commenting out
   
-  console.log("MusicPlayer Render: songsData.length =", songsData.length); // Check this log
+  console.log("MusicPlayer Render: songsData.length =", songsData.length);
   // REMOVE useEffect hook that loads songs dynamically
   // useEffect(() => { ... import.meta.glob ... setSongs ... }, []);
 
@@ -560,8 +560,17 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
 
       {/* Song Name and Time */}
       <div className="mb-2">
+        {/* Log Before Mapping/Rendering Song Info */}
+        {(() => {
+          console.log("MusicPlayer - Attempting to render songs. Count:", songs.length, "Current Song Name:", songName);
+          return null; // This IIFE is just for logging, doesn't render anything itself
+        })()}
         <div className="text-center truncate text-gray-700 dark:text-gray-300 mb-1">
-          {songs.length > 0 ? songName : "No songs found"}
+          {songs.length === 0 ? (
+            <p>No songs found.</p> 
+          ) : (
+            songName // Display the current songName state
+          )}
         </div>
         
         {/* Equalizer Canvas */}

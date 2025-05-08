@@ -146,12 +146,6 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
     }
   }, [postureStatus.isGood, isSessionActive, onPostureChange]);
 
-  useEffect(() => {
-    if (!isDetecting && !isLoadingDetector && !cameraError) { 
-      startPostureDetection();
-    }
-  }, [isDetecting, isLoadingDetector, startPostureDetection, cameraError]);
-
   // Add UI Debug Log for Status
   console.log("UI RENDER: PostureView received postureStatus:", postureStatus); 
 
@@ -172,14 +166,14 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         </div>
       </div>
       
-      <div className="relative mx-auto bg-gray-700" style={{ width: '640px', height: '480px', overflow: 'hidden' }}>
+      <div className="relative w-full bg-black">
         {isLoadingDetector && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20">
             <div className="text-white text-lg">Loading posture detector...</div>
           </div>
         )}
         
-        {cameraError && (
+        {cameraError && !isLoadingDetector && (
           <div className="absolute inset-0 flex items-center justify-center bg-red-900/20 z-20">
             <div className="text-white bg-red-900/80 p-4 rounded-lg max-w-md">
               <h3 className="text-lg font-bold mb-2">Camera Error</h3>
@@ -193,7 +187,13 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           autoPlay
           playsInline 
           muted 
-          style={{ transform: 'scaleX(-1)', display: 'block', width: '100%', height: '100%' }}
+          style={{ 
+            transform: "scaleX(-1)", 
+            display: 'block', 
+            width: '100%',
+            height: 'auto',
+            objectFit: 'contain' 
+          }}
           className=""
         />
         
@@ -212,7 +212,11 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
             {isCalibrating && countdown !== null ? 
               <span>Calibrating... {countdown}</span> : 
               <span>
-                {postureStatus.isGood ? '✅ Good' : '❌ Bad'} | {postureStatus.message}
+                {(() => {
+                    const msg = postureStatus.message;
+                    console.log("UI RENDER - Rendering status message:", msg);
+                    return `${postureStatus.isGood ? '✅ Good' : '❌ Bad'} | ${msg}`;
+                })()}
               </span>
             }
           </div>
