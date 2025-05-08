@@ -5,6 +5,36 @@ interface MusicPlayerProps {
   isSessionActive?: boolean;
 }
 
+// Define the Song type (ensure this matches your actual type)
+interface Song {
+  title: string;
+  artist: string;
+  src: string; // URL or path to the audio file
+  duration: number; // Duration in seconds
+}
+
+// Define some sample songs - ADJUST PATHS AS NEEDED
+const songsData: Song[] = [
+  {
+    title: 'Lofi Chill',
+    artist: 'Studio Beats',
+    src: '/music/lofi-chill.mp3', // Assumes music is in public/music/
+    duration: 150, // Example duration
+  },
+  {
+    title: 'Ambient Calm',
+    artist: 'Relax Sounds',
+    src: '/music/ambient-calm.mp3', // Assumes music is in public/music/
+    duration: 210, 
+  },
+  {
+    title: 'Study Flow',
+    artist: 'Focus Tracks',
+    src: '/music/study-flow.mp3', // Assumes music is in public/music/
+    duration: 185,
+  },
+];
+
 export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   const currentAudioRef = useRef<HTMLAudioElement>(null);
   const nextAudioRef = useRef<HTMLAudioElement>(null);
@@ -27,6 +57,7 @@ export const MusicPlayer = ({ isSessionActive = false }: MusicPlayerProps) => {
   const [playInSession, setPlayInSession] = useState(false);
   const fadeIntervalRef = useRef<number | null>(null);
   const prevIsSessionActiveRef = useRef(isSessionActive);
+  const [showPlayer, setShowPlayer] = useState(false);
   
   // Load songs using import.meta.glob
   useEffect(() => {

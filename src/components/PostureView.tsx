@@ -89,17 +89,15 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
       ];
 
       landmarks.forEach((landmark, index) => {
-        // ONLY draw if the index is one of our key landmarks
         if (keyLandmarks.includes(index) && landmark && landmark.visibility && landmark.visibility > 0.5 && typeof landmark.x === 'number' && typeof landmark.y === 'number') {
           ctx.beginPath();
           ctx.arc(
              (1 - landmark.x) * canvas.width, // Mirrored X
              landmark.y * canvas.height, 
-             4, // Increased dot size slightly
-             0, 
-             2 * Math.PI
+             5, // Increased dot size for visibility
+             0, 2 * Math.PI
           ); 
-          ctx.fillStyle = isGoodPosture ? "lightgreen" : "pink"; 
+          ctx.fillStyle = isGoodPosture ? "rgba(144, 238, 144, 0.8)" : "rgba(255, 182, 193, 0.8)"; // Slightly opaque lightgreen/pink
           ctx.fill();
         }
       });
@@ -154,7 +152,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
   }, [isDetecting, isLoadingDetector, startPostureDetection, cameraError]);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden w-full max-w-[640px] mx-auto">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden max-w-[640px] mx-auto">
       <div className="p-4 pb-2 flex justify-between items-center">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
           🎥 Posture Tracker
@@ -170,7 +168,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         </div>
       </div>
       
-      <div className="relative mx-auto" style={{ width: '640px', height: '480px' }}>
+      <div className="relative mx-auto bg-black" style={{ width: '640px', height: '480px' }}>
         {isLoadingDetector && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20">
             <div className="text-white text-lg">Loading posture detector...</div>
@@ -188,13 +186,17 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
 
         <video
           ref={videoRef}
-          width="640"
-          height="480"
           autoPlay
           playsInline 
           muted 
-          style={{ transform: "scaleX(-1)" }} 
-          className="block w-full h-full object-cover rounded"
+          style={{ 
+            transform: "scaleX(-1)", 
+            display: 'block', 
+            width: '100%',   
+            height: '100%',  
+            objectFit: 'cover'
+          }} 
+          className="rounded"
         />
         
         {videoRef.current && detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
@@ -208,7 +210,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         )}
         
         {detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
-          <div className="absolute top-2 right-2 p-2 rounded bg-black/50 text-white text-xs">
+          <div className="absolute top-2 right-2 p-1 px-2 rounded bg-black/60 text-white text-xs font-medium z-10">
             {isCalibrating && countdown !== null ? 
               <span>Calibrating... {countdown}</span> : 
               <span>{postureStatus.isGood ? '✅ Good' : '❌ Bad'} | {postureStatus.message}</span>
