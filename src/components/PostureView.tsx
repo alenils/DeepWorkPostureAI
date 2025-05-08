@@ -57,23 +57,36 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
       }
     }
 
-    // Draw current landmarks dots - REMOVED/COMMENTED OUT
-    /*
+    // Draw KEY landmark dots (Nose, Ears, Shoulders)
     if (landmarks && landmarks.length > 0) {
       ctx.save();
-      landmarks.forEach((landmark) => {
-        if (landmark && landmark.visibility && landmark.visibility > 0.5 && typeof landmark.x === 'number' && typeof landmark.y === 'number') {
+      const keyLandmarks = [
+        POSE_LANDMARKS.NOSE,
+        POSE_LANDMARKS.LEFT_EAR, POSE_LANDMARKS.RIGHT_EAR,
+        POSE_LANDMARKS.LEFT_SHOULDER, POSE_LANDMARKS.RIGHT_SHOULDER
+      ];
+
+      landmarks.forEach((landmark, index) => {
+        // ONLY draw if the index is one of our key landmarks
+        if (keyLandmarks.includes(index) && landmark && landmark.visibility && landmark.visibility > 0.5 && typeof landmark.x === 'number' && typeof landmark.y === 'number') {
           ctx.beginPath();
-          ctx.arc((1 - landmark.x) * canvas.width, landmark.y * canvas.height, 3, 0, 2 * Math.PI);
-          ctx.fillStyle = isGoodPosture ? "lightgreen" : "pink";
+          // Mirrored X coordinate
+          ctx.arc(
+             (1 - landmark.x) * canvas.width, 
+             landmark.y * canvas.height, 
+             3, // Dot size
+             0, 
+             2 * Math.PI
+          ); 
+          // Use posture status to color the dots
+          ctx.fillStyle = isGoodPosture ? "lightgreen" : "pink"; 
           ctx.fill();
         }
       });
       ctx.restore(); 
     }
-    */
-   // Keep the console log for dimensions if needed for debugging video size
-   console.log(`CanvasOverlay: video naturalW=${video?.videoWidth}, naturalH=${video?.videoHeight}, clientW=${video?.clientWidth}, clientH=${video?.clientHeight}. Set canvas size to w=${canvas.width}, h=${canvas.height}`);
+    // Keep the console log for dimensions
+    console.log(`CanvasOverlay: video naturalW=${video?.videoWidth}, naturalH=${video?.videoHeight}, clientW=${video?.clientWidth}, clientH=${video?.clientHeight}. Set canvas size to w=${canvas.width}, h=${canvas.height}`);
 
   }, [videoElement, landmarks, baselinePose, isGoodPosture, isCalibrated]);
 
@@ -110,7 +123,8 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
     stopPostureDetection,
     isDetecting,
     isLoadingDetector,
-    cameraError
+    cameraError,
+    countdown
   } = usePosture();
 
   useEffect(() => {
@@ -142,7 +156,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         </div>
       </div>
       
-      <div className="relative" style={{ minHeight: '240px' }}>
+      <div className="relative mx-auto" style={{ width: '640px', height: '480px' }}>
         {isLoadingDetector && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20">
             <div className="text-white text-lg">Loading posture detector...</div>
@@ -166,7 +180,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           playsInline 
           muted 
           style={{ transform: "scaleX(-1)" }} 
-          className="object-cover rounded block mx-auto"
+          className="block w-full h-full object-cover rounded"
         />
         
         {videoRef.current && detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
@@ -181,7 +195,10 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         
         {detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
           <div className="absolute top-2 right-2 p-2 rounded bg-black/50 text-white text-xs">
-            <span>{postureStatus.isGood ? '✅ Good' : '❌ Bad'} | {postureStatus.message}</span>
+            {isCalibrated && postureStatus.message === "Calibrating... Hold still!" ? 
+              <span>Calibrating... {countdown}</span> : 
+              <span>{postureStatus.isGood ? '✅ Good' : '❌ Bad'} | {postureStatus.message}</span>
+            }
           </div>
         )}
       </div>

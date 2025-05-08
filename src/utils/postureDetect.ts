@@ -57,9 +57,19 @@ export function calculateAngle(
 
 export function isGoodPosture(
   landmarks: NormalizedLandmark[],
-  baselinePose: NormalizedLandmark[] | null | undefined, // Explicitly allow null/undefined
-  // Decrease default head drop threshold
-  thresholds: { threshold_Y_drop?: number } = { threshold_Y_drop: 0.02 } 
+  baselinePose: NormalizedLandmark[] | null | undefined,
+  // Adjust default thresholds
+  thresholds: { 
+    threshold_Y_drop?: number; 
+    tiltThreshold?: number; 
+    forwardLeanThresholdX?: number;
+    leanBackThresholdX?: number; 
+  } = { 
+    threshold_Y_drop: 0.025,    // Slightly less sensitive drop
+    tiltThreshold: 0.025,       // Keep tilt sensitivity
+    forwardLeanThresholdX: 0.035, // Slightly less sensitive forward lean
+    leanBackThresholdX: 0.05     // *** MUCH less sensitive lean back ***
+  }
 ): { isGood: boolean; message: string } {
   if (!landmarks || landmarks.length === 0) {
     return { isGood: false, message: "No landmarks detected." };
@@ -89,7 +99,7 @@ export function isGoodPosture(
   // --- Head Drop Check --- 
   const calibratedNoseY = baselineNose.y;
   const currentNoseY = nose.y;
-  const effective_threshold_Y_drop = thresholds.threshold_Y_drop ?? 0.02; // Use passed or default 0.02
+  const effective_threshold_Y_drop = thresholds.threshold_Y_drop ?? 0.025; // Use default from signature
 
   // console.log(`POSTURE CHECK (Calibrated): BaselineNoseY: ${calibratedNoseY.toFixed(3)}, CurrentNoseY: ${currentNoseY.toFixed(3)}, DropThreshold: ${effective_threshold_Y_drop.toFixed(3)}, BadIfCurrentGreaterThan: ${(calibratedNoseY + effective_threshold_Y_drop).toFixed(3)}`);
 
@@ -99,37 +109,32 @@ export function isGoodPosture(
   }
   
   // --- Sideways Head Movement / Tilt Check --- 
-  // Decrease threshold for sideways nose movement relative to baseline
-  const threshold_sideways_nose_movement = 0.03; 
+  const threshold_sideways_nose_movement = 0.03; // Keep this relatively tight for now
   if (Math.abs(nose.x - baselineNose.x) > threshold_sideways_nose_movement) {
     console.log("POSTURE CHECK: Result -> BAD (Head moved sideways)");
     return { isGood: false, message: "Head moved sideways!" };
   }
-  // Add a basic tilt check based on ear height difference (relative)
   if (leftEar && rightEar) {
-    const tiltThreshold = 0.025; // Smaller difference indicates tilt
-    if (Math.abs(leftEar.y - rightEar.y) > tiltThreshold) {
+    const effective_tiltThreshold = thresholds.tiltThreshold ?? 0.025; // Use default from signature
+    if (Math.abs(leftEar.y - rightEar.y) > effective_tiltThreshold) {
         console.log("POSTURE CHECK: Result -> BAD (Head tilted)");
         return { isGood: false, message: "Head tilted!" };
     }
   }
   
   // --- Forward Lean / Lean Back Check --- 
-  // Requires ear and shoulder landmarks
   if (leftEar && rightEar && leftShoulder && rightShoulder) {
     const earCenterX = (leftEar.x + rightEar.x) / 2;
     const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
     
-    // Check for forward lean (ear X significantly less than shoulder X)
-    const forwardLeanThresholdX = 0.03; // Smaller distance indicates lean
-    if (earCenterX < shoulderCenterX - forwardLeanThresholdX) {
+    const effective_forwardLeanThresholdX = thresholds.forwardLeanThresholdX ?? 0.035; // Use default
+    if (earCenterX < shoulderCenterX - effective_forwardLeanThresholdX) {
         console.log("POSTURE CHECK: Result -> BAD (Leaning forward)");
         return { isGood: false, message: "Leaning forward!" };
     }
 
-    // Check for leaning back (ear X significantly greater than shoulder X)
-    const leanBackThresholdX = 0.02; // Adjust as needed
-    if (earCenterX > shoulderCenterX + leanBackThresholdX) {
+    const effective_leanBackThresholdX = thresholds.leanBackThresholdX ?? 0.05; // Use default
+    if (earCenterX > shoulderCenterX + effective_leanBackThresholdX) {
        console.log("POSTURE CHECK: Result -> BAD (Leaning back)");
        return { isGood: false, message: "Leaning back!" };
     }
