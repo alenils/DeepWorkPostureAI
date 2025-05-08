@@ -228,14 +228,14 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
           throw new Error("Pose detector could not be initialized after attempt.");
       }
 
-      console.log("CONTEXT: Posture detection starting interval (300ms).");
+      console.log("CONTEXT: Posture detection starting interval (500ms).");
       setIsDetecting(true);
       detectingRef.current = true;
       setIsLoadingDetector(false);
 
       if (intervalIdRef.current) clearInterval(intervalIdRef.current);
 
-      intervalIdRef.current = window.setInterval(() => { // Use window.setInterval
+      intervalIdRef.current = window.setInterval(() => {
         if (detectingRef.current && videoRef.current && videoRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && videoRef.current.videoWidth > 0) {
           const now = performance.now();
           poseDetector.detect(videoRef.current, now);
@@ -243,7 +243,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
              if (intervalIdRef.current) clearInterval(intervalIdRef.current);
              intervalIdRef.current = null;
         }
-      }, 300); // <--- Changed interval to 300ms
+      }, 500);
 
     } catch (err) {
       console.error("Error starting posture detection:", err);

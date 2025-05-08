@@ -42,13 +42,10 @@ export function calculateAngle(
   b: NormalizedLandmark,
   c: NormalizedLandmark
 ): number {
-  // Ensure a, b, c are valid landmarks before accessing x, y
   if (!a || !b || !c) return 0;
-
   const radians =
     Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
   let angle = Math.abs((radians * 180.0) / Math.PI);
-
   if (angle > 180.0) {
     angle = 360 - angle;
   }
@@ -57,102 +54,76 @@ export function calculateAngle(
 
 export function isGoodPosture(
   landmarks: NormalizedLandmark[],
-  baselinePose: NormalizedLandmark[] | null | undefined,
-  // Adjust default thresholds
-  thresholds: { 
-    threshold_Y_drop?: number; 
-    tiltThreshold?: number; 
-    forwardLeanThresholdX?: number;
-    leanBackThresholdX?: number; 
-  } = { 
-    threshold_Y_drop: 0.025,    // Slightly less sensitive drop
-    tiltThreshold: 0.025,       // Keep tilt sensitivity
-    forwardLeanThresholdX: 0.035, // Slightly less sensitive forward lean
-    leanBackThresholdX: 0.05     // *** MUCH less sensitive lean back ***
-  }
+  baselinePose: NormalizedLandmark[] | null | undefined
 ): { isGood: boolean; message: string } {
-  if (!landmarks || landmarks.length === 0) {
-    return { isGood: false, message: "No landmarks detected." };
-  }
 
-  const nose = landmarks[POSE_LANDMARKS.NOSE];
-  if (!nose) {
-    return { isGood: false, message: "Nose landmark missing." };
+  // --- Reference App Thresholds ---
+  const Y_NOSE_THRESHOLD = 0.06; 
+  const X_NOSE_THRESHOLD = 0.06;
+  const Y_EAR_TILT_THRESHOLD = 0.03; 
+  // ---
+
+  const requiredIndices = [POSE_LANDMARKS.NOSE, POSE_LANDMARKS.LEFT_EAR, POSE_LANDMARKS.RIGHT_EAR];
+  const maxRequiredIndex = Math.max(...requiredIndices);
+
+  if (!landmarks || landmarks.length <= maxRequiredIndex) {
+    return { isGood: false, message: "Key landmarks missing." }; 
   }
 
   if (!baselinePose) {
     return { isGood: true, message: "Calibrate to begin." }; 
   }
 
-  const baselineNose = baselinePose[POSE_LANDMARKS.NOSE];
-  if (!baselineNose) {
-    console.warn("POSTURE CHECK: Baseline pose set, but baseline nose landmark is missing.");
-    return { isGood: false, message: "Calibration error: Baseline nose missing." };
+  if (baselinePose.length <= maxRequiredIndex) {
+    console.warn("POSTURE CHECK: Baseline pose invalid (missing key landmarks).");
+    return { isGood: false, message: "Calibration error: Invalid baseline." };
   }
-  
-  // Get necessary landmarks for other checks
+
+  const nose = landmarks[POSE_LANDMARKS.NOSE];
   const leftEar = landmarks[POSE_LANDMARKS.LEFT_EAR];
   const rightEar = landmarks[POSE_LANDMARKS.RIGHT_EAR];
-  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
-  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const baselineNose = baselinePose[POSE_LANDMARKS.NOSE];
 
-  // --- Head Drop Check --- 
-  const calibratedNoseY = baselineNose.y;
-  const currentNoseY = nose.y;
-  const effective_threshold_Y_drop = thresholds.threshold_Y_drop ?? 0.025; // Use default from signature
-
-  // console.log(`POSTURE CHECK (Calibrated): BaselineNoseY: ${calibratedNoseY.toFixed(3)}, CurrentNoseY: ${currentNoseY.toFixed(3)}, DropThreshold: ${effective_threshold_Y_drop.toFixed(3)}, BadIfCurrentGreaterThan: ${(calibratedNoseY + effective_threshold_Y_drop).toFixed(3)}`);
-
-  if (currentNoseY > calibratedNoseY + effective_threshold_Y_drop) {
-    console.log("POSTURE CHECK: Result -> BAD (Head dropped)");
-    return { isGood: false, message: "Head dropped!" };
-  }
-  
-  // --- Sideways Head Movement / Tilt Check --- 
-  const threshold_sideways_nose_movement = 0.03; // Keep this relatively tight for now
-  if (Math.abs(nose.x - baselineNose.x) > threshold_sideways_nose_movement) {
-    console.log("POSTURE CHECK: Result -> BAD (Head moved sideways)");
-    return { isGood: false, message: "Head moved sideways!" };
-  }
-  if (leftEar && rightEar) {
-    const effective_tiltThreshold = thresholds.tiltThreshold ?? 0.025; // Use default from signature
-    if (Math.abs(leftEar.y - rightEar.y) > effective_tiltThreshold) {
-        console.log("POSTURE CHECK: Result -> BAD (Head tilted)");
-        return { isGood: false, message: "Head tilted!" };
-    }
-  }
-  
-  // --- Forward Lean / Lean Back Check --- 
-  if (leftEar && rightEar && leftShoulder && rightShoulder) {
-    const earCenterX = (leftEar.x + rightEar.x) / 2;
-    const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
-    
-    const effective_forwardLeanThresholdX = thresholds.forwardLeanThresholdX ?? 0.035; // Use default
-    if (earCenterX < shoulderCenterX - effective_forwardLeanThresholdX) {
-        console.log("POSTURE CHECK: Result -> BAD (Leaning forward)");
-        return { isGood: false, message: "Leaning forward!" };
-    }
-
-    const effective_leanBackThresholdX = thresholds.leanBackThresholdX ?? 0.05; // Use default
-    if (earCenterX > shoulderCenterX + effective_leanBackThresholdX) {
-       console.log("POSTURE CHECK: Result -> BAD (Leaning back)");
-       return { isGood: false, message: "Leaning back!" };
-    }
+  // Check for valid landmark data
+  if (!nose?.x || !nose?.y || 
+      !leftEar?.y || !rightEar?.y || 
+      !baselineNose?.x || !baselineNose?.y) {
+     console.warn("POSTURE CHECK: Missing required coordinate data in nose/ear landmarks.");
+     return { isGood: false, message: "Landmark data error!" }; 
   }
 
-  console.log("POSTURE CHECK: Result -> GOOD");
+  // 1. Check Vertical Nose Difference
+  const yDiff = Math.abs(nose.y - baselineNose.y);
+  if (yDiff > Y_NOSE_THRESHOLD) {
+    console.log(`POSTURE CHECK: Result -> BAD (Nose Y Diff: ${yDiff.toFixed(3)} > ${Y_NOSE_THRESHOLD})`);
+    return { isGood: false, message: "Vertical head position changed!" }; 
+  }
+
+  // 2. Check Horizontal Nose Difference
+  const xDiff = Math.abs(nose.x - baselineNose.x);
+  if (xDiff > X_NOSE_THRESHOLD) {
+    console.log(`POSTURE CHECK: Result -> BAD (Nose X Diff: ${xDiff.toFixed(3)} > ${X_NOSE_THRESHOLD})`);
+    return { isGood: false, message: "Horizontal head position changed!" };
+  }
+
+  // 3. Check Ear Tilt (Vertical Difference)
+  const earDiffY = Math.abs(leftEar.y - rightEar.y);
+  if (earDiffY > Y_EAR_TILT_THRESHOLD) {
+    console.log(`POSTURE CHECK: Result -> BAD (Ear Y Diff: ${earDiffY.toFixed(3)} > ${Y_EAR_TILT_THRESHOLD})`);
+    return { isGood: false, message: "Head tilted!" }; 
+  }
+
+  console.log("POSTURE CHECK: Result -> GOOD (Reference Logic)");
   return { isGood: true, message: "Posture OK!" };
 }
 
-// Get the Y coordinate of the eye line for display purposes
+// Get the Y coordinate of the eye line for display purposes (Can likely be removed if not used elsewhere)
 export function getEyeLine(landmarks: NormalizedLandmark[]): number {
   const leftEye = landmarks[POSE_LANDMARKS.LEFT_EYE];
   const rightEye = landmarks[POSE_LANDMARKS.RIGHT_EYE];
   
   if (!leftEye || !rightEye) {
-    // console.warn("Eye landmarks not available for eye line calculation.");
-    return 0; // Return 0 or some default if eyes aren't detected
+    return 0; 
   }
-  // Use the average Y position of the eyes
   return (leftEye.y + rightEye.y) / 2;
 } 

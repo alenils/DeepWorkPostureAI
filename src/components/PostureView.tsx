@@ -57,35 +57,38 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
       }
     }
 
-    // Draw KEY landmark dots (Nose, Ears, Shoulders)
+    // Draw KEY landmark dots (Nose, Eyes, Ears, Shoulders)
     if (landmarks && landmarks.length > 0) {
       ctx.save();
       const keyLandmarks = [
-        POSE_LANDMARKS.NOSE,
-        POSE_LANDMARKS.LEFT_EAR, POSE_LANDMARKS.RIGHT_EAR,
-        POSE_LANDMARKS.LEFT_SHOULDER, POSE_LANDMARKS.RIGHT_SHOULDER
+        POSE_LANDMARKS.NOSE,          // 0
+        POSE_LANDMARKS.LEFT_EYE,        // 2
+        POSE_LANDMARKS.RIGHT_EYE,       // 5
+        POSE_LANDMARKS.LEFT_EAR,        // 7
+        POSE_LANDMARKS.RIGHT_EAR,       // 8
+        POSE_LANDMARKS.LEFT_SHOULDER,   // 11
+        POSE_LANDMARKS.RIGHT_SHOULDER,  // 12
       ];
 
       landmarks.forEach((landmark, index) => {
         // ONLY draw if the index is one of our key landmarks
         if (keyLandmarks.includes(index) && landmark && landmark.visibility && landmark.visibility > 0.5 && typeof landmark.x === 'number' && typeof landmark.y === 'number') {
           ctx.beginPath();
-          // Mirrored X coordinate
           ctx.arc(
-             (1 - landmark.x) * canvas.width, 
+             (1 - landmark.x) * canvas.width, // Mirrored X
              landmark.y * canvas.height, 
-             3, // Dot size
+             4, // Increased dot size slightly
              0, 
              2 * Math.PI
           ); 
-          // Use posture status to color the dots
           ctx.fillStyle = isGoodPosture ? "lightgreen" : "pink"; 
           ctx.fill();
         }
       });
       ctx.restore(); 
     }
-    // Keep the console log for dimensions
+    
+    // Keep the console log for dimensions active
     console.log(`CanvasOverlay: video naturalW=${video?.videoWidth}, naturalH=${video?.videoHeight}, clientW=${video?.clientWidth}, clientH=${video?.clientHeight}. Set canvas size to w=${canvas.width}, h=${canvas.height}`);
 
   }, [videoElement, landmarks, baselinePose, isGoodPosture, isCalibrated]);
@@ -124,6 +127,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
     isDetecting,
     isLoadingDetector,
     cameraError,
+    isCalibrating,
     countdown
   } = usePosture();
 
@@ -148,10 +152,10 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         <div className="flex space-x-2">
           <button 
             onClick={handleCalibration} 
-            disabled={!detectedLandmarks || detectedLandmarks.length === 0 || isLoadingDetector || !!cameraError || postureStatus.message === "Calibrating... Hold still!"}
+            disabled={!detectedLandmarks || detectedLandmarks.length === 0 || isLoadingDetector || !!cameraError || isCalibrating} 
             className="bg-gray-700/80 hover:bg-gray-600 text-white px-3 py-1 rounded font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {postureStatus.message === "Calibrating... Hold still!" ? "Calibrating..." : "Calibrate"}
+            {isCalibrating ? `Calibrating (${countdown ?? ''}...)` : "Calibrate"} 
           </button>
         </div>
       </div>
@@ -195,7 +199,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
         
         {detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
           <div className="absolute top-2 right-2 p-2 rounded bg-black/50 text-white text-xs">
-            {isCalibrated && postureStatus.message === "Calibrating... Hold still!" ? 
+            {isCalibrating && countdown !== null ? 
               <span>Calibrating... {countdown}</span> : 
               <span>{postureStatus.isGood ? '✅ Good' : '❌ Bad'} | {postureStatus.message}</span>
             }
