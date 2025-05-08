@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { usePosture } from "@/context/PostureContext";
 import { POSE_LANDMARKS } from "@/utils/postureDetect";
+import PostureControls from './PostureControls';
 
 // Connection lines commented out as per request
 /*
@@ -151,6 +152,9 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
     }
   }, [isDetecting, isLoadingDetector, startPostureDetection, cameraError]);
 
+  // Add UI Debug Log for Status
+  console.log("UI RENDER: PostureView received postureStatus:", postureStatus); 
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden max-w-[640px] mx-auto">
       <div className="p-4 pb-2 flex justify-between items-center">
@@ -191,9 +195,10 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           muted 
           style={{ 
             transform: "scaleX(-1)", 
+            display: 'block',
             width: '100%',   
             height: '100%',  
-            objectFit: 'cover'
+            objectFit: 'cover !important' as any
           }} 
           className="rounded"
         />
@@ -217,6 +222,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           </div>
         )}
       </div>
+      <PostureControls />
     </div>
   );
 };

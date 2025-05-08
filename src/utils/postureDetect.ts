@@ -66,10 +66,10 @@ export function isGoodPosture(
 ): { isGood: boolean; message: string } {
 
   // --- Reference App Thresholds (Keep these fixed) ---
-  const Y_NOSE_THRESHOLD = 0.06; 
-  const X_NOSE_THRESHOLD = 0.06;
-  const Y_EAR_TILT_THRESHOLD = 0.03; 
-  const EAR_SHOULDER_DIST_THRESHOLD = 0.03; // Threshold for lean check
+  const Y_NOSE_THRESHOLD = 0.08;          // Relaxed ref value
+  const X_NOSE_THRESHOLD = 0.08;          // Relaxed ref value
+  const Y_EAR_TILT_THRESHOLD = 0.04;       // Relaxed ref value
+  const EAR_SHOULDER_DIST_THRESHOLD = 0.05; // Relaxed lean check
   // ---
 
   // Check for required landmarks (Nose, Ears, Shoulders for lean check)
