@@ -10,15 +10,30 @@ const POSE_CONNECTIONS: [number, number][] = [
 ];
 */
 
+// Define BaselineMetrics interface (or import from context if exported)
+interface BaselineMetrics {
+  noseY: number;
+  noseX: number; 
+  earShoulderDistX: number; 
+}
+
 export interface PostureViewProps {
   isSessionActive?: boolean;
   onPostureChange?: (isGood: boolean) => void;
 }
 
+interface CanvasOverlayProps { 
+    videoElement: HTMLVideoElement | null;
+    landmarks?: NormalizedLandmark[];
+    baselineMetrics: BaselineMetrics | null | undefined;
+    isGoodPosture: boolean;
+    isCalibrated: boolean;
+}
+
 const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
   videoElement,
   landmarks,
-  baselinePose,
+  baselineMetrics,
   isGoodPosture,
   isCalibrated,
 }) => {
@@ -47,13 +62,16 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (isCalibrated && baselinePose && baselinePose.length > 0 && baselinePose[POSE_LANDMARKS.NOSE]) {
-      const baselineNoseLandmark = baselinePose[POSE_LANDMARKS.NOSE];
-      if (baselineNoseLandmark && typeof baselineNoseLandmark.y === 'number') { 
-        const barHeight = 10; 
-        const barY = baselineNoseLandmark.y * canvas.height;
-        ctx.fillStyle = isGoodPosture ? "rgba(0, 255, 0, 0.5)" : "rgba(255, 0, 0, 0.5)";
-        ctx.fillRect(0, barY - barHeight / 2, canvas.width, barHeight);
+    // Draw horizontal bar (using baselineMetrics)
+    if (isCalibrated && baselineMetrics && typeof baselineMetrics.noseY === 'number') {
+      const baselineNoseCanvasY = baselineMetrics.noseY * canvas.height;
+      const barHeight = 10; 
+      const barColor = isGoodPosture ? "rgba(0, 255, 0, 0.5)" : "rgba(255, 0, 0, 0.5)";
+      ctx.fillStyle = barColor;
+      ctx.fillRect(0, baselineNoseCanvasY - barHeight / 2, canvas.width, barHeight);
+    } else {
+      if (isCalibrated) {
+        console.log("CANVAS: Bar not drawn. isCalibrated=true, but baselineMetrics missing or invalid.", baselineMetrics);
       }
     }
 
@@ -91,7 +109,7 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
     // Keep the console log for dimensions active
     console.log(`CanvasOverlay: video naturalW=${video?.videoWidth}, naturalH=${video?.videoHeight}, clientW=${video?.clientWidth}, clientH=${video?.clientHeight}. Set canvas size to w=${canvas.width}, h=${canvas.height}`);
 
-  }, [videoElement, landmarks, baselinePose, isGoodPosture, isCalibrated]);
+  }, [videoElement, landmarks, baselineMetrics, isGoodPosture, isCalibrated]);
 
   return (
     <canvas
@@ -106,19 +124,11 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
   );
 };
 
-interface CanvasOverlayProps { // Moved interface definition here to be used by CanvasOverlay 
-    videoElement: HTMLVideoElement | null;
-    landmarks?: NormalizedLandmark[];
-    baselinePose?: NormalizedLandmark[];
-    isGoodPosture: boolean;
-    isCalibrated: boolean;
-}
-
 export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPostureChange }) => {
   const {
     videoRef,
     detectedLandmarks,
-    baselinePose,
+    baselineMetrics,
     postureStatus,
     isCalibrated,
     handleCalibration,
@@ -191,7 +201,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           <CanvasOverlay
             videoElement={videoRef.current}
             landmarks={detectedLandmarks}
-            baselinePose={baselinePose}
+            baselineMetrics={baselineMetrics}
             isGoodPosture={postureStatus.isGood}
             isCalibrated={isCalibrated}
           />

@@ -14,21 +14,30 @@ import {
 } from "@mediapipe/tasks-vision";
 import { isGoodPosture, POSE_LANDMARKS } from "@/utils/postureDetect"; // Ensure this path is correct
 
+// Define structure for baseline metrics
+interface BaselineMetrics {
+  noseY: number;
+  noseX: number; 
+  // shoulderY: number; // Not needed for current ref logic + lean check
+  earShoulderDistX: number; // For lean check
+  // noseShoulderDiffY: number; // Not needed
+}
+
 // Update the PostureContextType interface
 interface PostureContextType {
   videoRef: React.RefObject<HTMLVideoElement>;
   startPostureDetection: () => Promise<void>;
   stopPostureDetection: () => void;
   isDetecting: boolean;
-  detectedLandmarks: NormalizedLandmark[] | undefined; // Updated type
-  baselinePose: NormalizedLandmark[] | undefined; // Updated type
+  detectedLandmarks: NormalizedLandmark[] | undefined;
+  baselineMetrics: BaselineMetrics | null | undefined;
   handleCalibration: () => void;
   cameraError: string | null;
   postureStatus: { isGood: boolean; message: string };
   isCalibrated: boolean;
-  isCalibrating: boolean; // Added state for calibration process
+  isCalibrating: boolean;
   isLoadingDetector: boolean;
-  countdown: number | null; // Added state for countdown display
+  countdown: number | null;
 }
 
 const PostureContext = createContext<PostureContextType | undefined>(undefined);
@@ -41,9 +50,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   const [detectedLandmarks, setDetectedLandmarks] = useState<
     NormalizedLandmark[] | undefined
   >(undefined);
-  const [baselinePose, setBaselinePose] = useState<
-    NormalizedLandmark[] | undefined
-  >(undefined);
+  const [baselineMetrics, setBaselineMetrics] = useState<BaselineMetrics | null | undefined>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [postureStatus, setPostureStatus] = useState<{ isGood: boolean; message: string }>({
     isGood: true, // Default to green bar initially, or false for red
@@ -59,7 +66,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Refs for state values
   const isCalibratedRef = useRef(isCalibrated);
-  const baselinePoseRef = useRef(baselinePose);
+  const baselineMetricsRef = useRef(baselineMetrics);
   const detectedLandmarksRef = useRef(detectedLandmarks);
   const postureStatusRef = useRef(postureStatus);
 
@@ -69,8 +76,8 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [isCalibrated]);
 
   useEffect(() => {
-    baselinePoseRef.current = baselinePose;
-  }, [baselinePose]);
+    baselineMetricsRef.current = baselineMetrics;
+  }, [baselineMetrics]);
 
   useEffect(() => {
     detectedLandmarksRef.current = detectedLandmarks;
@@ -109,28 +116,38 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
             setPostureStatus({ isGood: true, message: `Capturing...` }); 
             setCountdown(null);
 
-            console.log("CONTEXT: Capturing baseline after countdown...");
+            console.log("CONTEXT: Capturing baseline metrics after countdown...");
             const landmarksAtCalibrationTime = detectedLandmarksRef.current;
+            const nose = landmarksAtCalibrationTime?.[POSE_LANDMARKS.NOSE];
+            const leftEar = landmarksAtCalibrationTime?.[POSE_LANDMARKS.LEFT_EAR];
+            const leftShoulder = landmarksAtCalibrationTime?.[POSE_LANDMARKS.LEFT_SHOULDER];
 
-            if (landmarksAtCalibrationTime && landmarksAtCalibrationTime.length > 0) {
-              const currentBaseline = landmarksAtCalibrationTime.map(lm => ({ ...lm }));
-              setBaselinePose(currentBaseline);
+            // Calculate baseline metrics
+            if (landmarksAtCalibrationTime && nose?.x && nose?.y && leftEar?.x && leftShoulder?.x) { 
+              const metrics: BaselineMetrics = {
+                noseY: nose.y,
+                noseX: nose.x,
+                earShoulderDistX: Math.abs(leftEar.x - leftShoulder.x)
+              };
+              setBaselineMetrics(metrics); // Store calculated metrics
               setIsCalibrated(true); // Calibration complete
               setIsCalibrating(false);
-              const status = isGoodPosture(landmarksAtCalibrationTime, currentBaseline);
+              // Check posture immediately with the new metrics
+              const status = isGoodPosture(landmarksAtCalibrationTime, metrics); 
               setPostureStatus(status);
-              console.log("CONTEXT: Calibration complete. isCalibrated=true. Status:", status);
+              console.log("CONTEXT: Calibration complete. isCalibrated=true. Metrics:", metrics, "Status:", status);
             } else {
-              console.warn("CONTEXT: No landmarks detected after calibration delay.");
+              console.warn("CONTEXT: Could not calculate baseline metrics - missing required landmarks after delay.");
               setPostureStatus({ isGood: false, message: "Calibration failed: landmarks lost." });
               setIsCalibrated(false);
               setIsCalibrating(false);
+              setBaselineMetrics(null); // Ensure metrics are null
             }
           }
         }, 1000); // 1-second interval
 
       } else {
-        console.warn("CONTEXT: Calibration attempt failed: No landmarks detected.");
+        console.warn("CONTEXT: Calibration attempt failed: Required landmarks missing.");
         setPostureStatus({ isGood: false, message: "Cannot calibrate - landmarks missing." });
         setIsCalibrating(false); // Ensure calibrating is false if failed to start
       }
@@ -143,15 +160,15 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   const handlePoseResults = useCallback(
     (result: PoseLandmarkerResult, timestampMs: number) => {
       const currentIsCalibrated = isCalibratedRef.current;
-      const currentBaselinePose = baselinePoseRef.current;
+      const currentBaselineMetrics = baselineMetricsRef.current;
       const currentPostureStatusMessage = postureStatusRef.current.message;
 
       if (result.landmarks && result.landmarks.length > 0) {
         const newLandmarksFromDetector = result.landmarks[0];
         setDetectedLandmarks(newLandmarksFromDetector);
 
-        if (currentIsCalibrated && currentBaselinePose) {
-          const status = isGoodPosture(newLandmarksFromDetector, currentBaselinePose);
+        if (currentIsCalibrated && currentBaselineMetrics) {
+          const status = isGoodPosture(newLandmarksFromDetector, currentBaselineMetrics);
           setPostureStatus(status);
         } else if (!isCalibrating) { // Only update if not in the middle of calibrating
           const preCalibrationStatus = isGoodPosture(newLandmarksFromDetector, null);
@@ -288,7 +305,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setDetectedLandmarks(undefined);
     setIsCalibrated(false); 
-    setBaselinePose(undefined);
+    setBaselineMetrics(null);
     setIsCalibrating(false); 
     setCountdown(null);
     setPostureStatus({ isGood: true, message: "Detection stopped." });
@@ -330,7 +347,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         stopPostureDetection,
         isDetecting,
         detectedLandmarks,
-        baselinePose,
+        baselineMetrics,
         handleCalibration,
         cameraError,
         postureStatus,

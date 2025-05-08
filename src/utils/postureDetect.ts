@@ -52,68 +52,88 @@ export function calculateAngle(
   return angle;
 }
 
+// Import or define BaselineMetrics interface here
+interface BaselineMetrics {
+  noseY: number;
+  noseX: number; 
+  earShoulderDistX: number; 
+}
+
+// Update function signature to accept BaselineMetrics
 export function isGoodPosture(
   landmarks: NormalizedLandmark[],
-  baselinePose: NormalizedLandmark[] | null | undefined
+  baselineMetrics: BaselineMetrics | null | undefined // Changed type here
 ): { isGood: boolean; message: string } {
 
-  // --- Reference App Thresholds ---
+  // --- Reference App Thresholds (Keep these fixed) ---
   const Y_NOSE_THRESHOLD = 0.06; 
   const X_NOSE_THRESHOLD = 0.06;
   const Y_EAR_TILT_THRESHOLD = 0.03; 
+  const EAR_SHOULDER_DIST_THRESHOLD = 0.03; // Threshold for lean check
   // ---
 
-  const requiredIndices = [POSE_LANDMARKS.NOSE, POSE_LANDMARKS.LEFT_EAR, POSE_LANDMARKS.RIGHT_EAR];
+  // Check for required landmarks (Nose, Ears, Shoulders for lean check)
+  const requiredIndices = [0, 7, 8, 11, 12];
   const maxRequiredIndex = Math.max(...requiredIndices);
-
   if (!landmarks || landmarks.length <= maxRequiredIndex) {
     return { isGood: false, message: "Key landmarks missing." }; 
   }
 
-  if (!baselinePose) {
-    return { isGood: true, message: "Calibrate to begin." }; 
-  }
-
-  if (baselinePose.length <= maxRequiredIndex) {
-    console.warn("POSTURE CHECK: Baseline pose invalid (missing key landmarks).");
-    return { isGood: false, message: "Calibration error: Invalid baseline." };
-  }
-
+  // Get current landmarks
   const nose = landmarks[POSE_LANDMARKS.NOSE];
   const leftEar = landmarks[POSE_LANDMARKS.LEFT_EAR];
   const rightEar = landmarks[POSE_LANDMARKS.RIGHT_EAR];
-  const baselineNose = baselinePose[POSE_LANDMARKS.NOSE];
+  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+  // const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER]; // Not strictly needed for current checks
 
-  // Check for valid landmark data
-  if (!nose?.x || !nose?.y || 
-      !leftEar?.y || !rightEar?.y || 
-      !baselineNose?.x || !baselineNose?.y) {
-     console.warn("POSTURE CHECK: Missing required coordinate data in nose/ear landmarks.");
+  // Check if all needed landmarks are valid
+  if (!nose?.x || !nose?.y || !leftEar?.x || !leftEar?.y || !rightEar?.y || !leftShoulder?.x /*|| !leftShoulder?.y || !rightShoulder?.y*/) {
+     console.warn("POSTURE CHECK: Missing required coordinate data.");
      return { isGood: false, message: "Landmark data error!" }; 
   }
 
-  // 1. Check Vertical Nose Difference
-  const yDiff = Math.abs(nose.y - baselineNose.y);
+  // If not calibrated (baselineMetrics is null/undefined), return neutral state
+  if (!baselineMetrics) {
+    return { isGood: true, message: "Calibrate to begin." }; 
+  }
+
+  // --- Perform Checks using Baseline Metrics --- 
+
+  // 1. Check Vertical Nose Difference vs Baseline Nose Y
+  const yDiff = Math.abs(nose.y - baselineMetrics.noseY);
   if (yDiff > Y_NOSE_THRESHOLD) {
     console.log(`POSTURE CHECK: Result -> BAD (Nose Y Diff: ${yDiff.toFixed(3)} > ${Y_NOSE_THRESHOLD})`);
     return { isGood: false, message: "Vertical head position changed!" }; 
   }
 
-  // 2. Check Horizontal Nose Difference
-  const xDiff = Math.abs(nose.x - baselineNose.x);
+  // 2. Check Horizontal Nose Difference vs Baseline Nose X 
+  const xDiff = Math.abs(nose.x - baselineMetrics.noseX);
   if (xDiff > X_NOSE_THRESHOLD) {
     console.log(`POSTURE CHECK: Result -> BAD (Nose X Diff: ${xDiff.toFixed(3)} > ${X_NOSE_THRESHOLD})`);
     return { isGood: false, message: "Horizontal head position changed!" };
   }
 
-  // 3. Check Ear Tilt (Vertical Difference)
+  // 3. Check Ear Tilt (Current Frame Only)
   const earDiffY = Math.abs(leftEar.y - rightEar.y);
   if (earDiffY > Y_EAR_TILT_THRESHOLD) {
     console.log(`POSTURE CHECK: Result -> BAD (Ear Y Diff: ${earDiffY.toFixed(3)} > ${Y_EAR_TILT_THRESHOLD})`);
     return { isGood: false, message: "Head tilted!" }; 
   }
+      
+  // 4. Forward/Backward Lean Check (Change in Ear-Shoulder Horizontal Distance)
+  const currentEarShoulderDistX = Math.abs(leftEar.x - leftShoulder.x); 
+  if (typeof baselineMetrics.earShoulderDistX === 'number') { 
+      if (Math.abs(currentEarShoulderDistX - baselineMetrics.earShoulderDistX) > EAR_SHOULDER_DIST_THRESHOLD) {
+           console.log(`POSTURE CHECK: BAD - Lean Fwd/Back (earShoulderDistX change ${Math.abs(currentEarShoulderDistX - baselineMetrics.earShoulderDistX).toFixed(3)} > ${EAR_SHOULDER_DIST_THRESHOLD})`);
+          const leanDirection = currentEarShoulderDistX < baselineMetrics.earShoulderDistX ? "forward" : "back";
+          return { isGood: false, message: `Leaning ${leanDirection}!` };
+      }
+  } else {
+       console.warn("POSTURE CHECK: Missing baseline earShoulderDistX for lean check.");
+  }
 
-  console.log("POSTURE CHECK: Result -> GOOD (Reference Logic)");
+  // If all checks pass
+  console.log("POSTURE CHECK: Result -> GOOD");
   return { isGood: true, message: "Posture OK!" };
 }
 
