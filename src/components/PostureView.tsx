@@ -191,7 +191,6 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           muted 
           style={{ 
             transform: "scaleX(-1)", 
-            display: 'block', 
             width: '100%',   
             height: '100%',  
             objectFit: 'cover'
@@ -209,7 +208,7 @@ export const PostureView: React.FC<PostureViewProps> = ({ isSessionActive, onPos
           />
         )}
         
-        {detectedLandmarks && detectedLandmarks.length > 0 && !cameraError && (
+        { !isLoadingDetector && !cameraError && detectedLandmarks && detectedLandmarks.length > 0 && (
           <div className="absolute top-2 right-2 p-1 px-2 rounded bg-black/60 text-white text-xs font-medium z-10">
             {isCalibrating && countdown !== null ? 
               <span>Calibrating... {countdown}</span> : 
