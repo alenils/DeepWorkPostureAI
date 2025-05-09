@@ -1,40 +1,29 @@
 import { useState, useEffect, useRef } from 'react';
 import { msToClock } from '../utils/time';
 
+// --- FOCUSED DIAGNOSTIC SECTION ---
+// ENSURE "A black feast.mp3" (or your chosen test file) is DIRECTLY in the /public folder for this test.
+const musicFilesFromGlob = import.meta.glob('/A black feast.mp3', { eager: true, as: 'url' });
+console.log("MusicPlayer [FOCUSED TEST]: Result of import.meta.glob('/A black feast.mp3'):", musicFilesFromGlob);
+
+interface Song {
+  name: string;
+  url: string;
+}
+
+const trackList: Song[] = Object.entries(musicFilesFromGlob).map(([path, url]) => {
+  console.log("MusicPlayer [FOCUSED TEST]: Processing path for trackList:", path, "url:", url);
+  return {
+    url,
+    name: decodeURIComponent(path).split('/').pop()!.replace('.mp3', '')
+  };
+});
+console.log("MusicPlayer [FOCUSED TEST]: Final generated trackList:", trackList);
+// --- END FOCUSED DIAGNOSTIC SECTION ---
+
 interface MusicPlayerProps {
   isSessionActive?: boolean;
 }
-
-// Define the Song type (ensure this matches your actual type)
-interface Song {
-  title: string;
-  artist: string;
-  src: string; // URL or path to the audio file
-  duration: number; // Duration in seconds
-}
-
-// Define some sample songs - ADJUST PATHS AS NEEDED
-const songsData: Song[] = [
-  {
-    title: 'Lofi Chill',
-    artist: 'Studio Beats',
-    src: '/sounds/lofi-chill.mp3', // PATH RELATIVE TO PUBLIC FOLDER
-    duration: 150, 
-  },
-  {
-    title: 'Ambient Calm',
-    artist: 'Relax Sounds',
-    src: '/sounds/ambient-calm.mp3', // PATH RELATIVE TO PUBLIC FOLDER
-    duration: 210, 
-  },
-  {
-    title: 'Study Flow',
-    artist: 'Focus Tracks',
-    src: '/sounds/study-flow.mp3', // PATH RELATIVE TO PUBLIC FOLDER
-    duration: 185,
-  },
-  // Add your actual songs here with correct paths like '/sounds/your-song.mp3'
-];
 
 const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive = false }) => {
   const currentAudioRef = useRef<HTMLAudioElement>(null);
@@ -46,10 +35,10 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   
-  // Initialize directly with songsData
-  const [songs, setSongs] = useState<Song[]>(songsData);
+  // Initialize songs state with the (potentially empty) trackList from the focused test
+  const [songs, setSongs] = useState<Song[]>(trackList);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
-  const [nextSongIndex, setNextSongIndex] = useState(songsData.length > 1 ? 1 : 0); // Initialize nextSongIndex based on songsData
+  const [nextSongIndex, setNextSongIndex] = useState(trackList.length > 1 ? 1 : 0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [songName, setSongName] = useState('');
   const [isCrossFading, setIsCrossFading] = useState(false);
@@ -60,32 +49,28 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
   const [playInSession, setPlayInSession] = useState(false);
   const fadeIntervalRef = useRef<number | null>(null);
   const prevIsSessionActiveRef = useRef(isSessionActive);
-  // const [showPlayer, setShowPlayer] = useState(false); // This state was unused, commenting out
   
-  console.log("MusicPlayer Render: songsData.length =", songsData.length);
-  // REMOVE useEffect hook that loads songs dynamically
-  // useEffect(() => { ... import.meta.glob ... setSongs ... }, []);
+  console.log("MusicPlayer Render: initial songs state length:", songs.length, "trackList length:", trackList.length);
 
-  // Initialize next song index and load last played song and preferences from localStorage
+  // Initialize/Update song related state from localStorage and trackList
   useEffect(() => {
+    console.log("MusicPlayer useEffect [songs]: songs.length =", songs.length);
     if (songs.length > 0) {
       const savedIndexStr = localStorage.getItem('lastSongIndex');
+      let initialIndex = 0;
       if (savedIndexStr !== null) {
         const savedIndex = parseInt(savedIndexStr, 10);
         if (savedIndex >= 0 && savedIndex < songs.length) {
-            setCurrentSongIndex(savedIndex);
-            setNextSongIndex((savedIndex + 1) % songs.length);
-        } else {
-            // Invalid index, default to 0
-            setCurrentSongIndex(0);
-            setNextSongIndex(songs.length > 1 ? 1 : 0);
+            initialIndex = savedIndex;
         }
-      } else {
-        // No saved index, default based on initial state
-        setCurrentSongIndex(0);
-        setNextSongIndex(songs.length > 1 ? 1 : 0);
       }
-      
+      setCurrentSongIndex(initialIndex);
+      setNextSongIndex((initialIndex + 1) % songs.length);
+      // Set initial song name
+      if (songs[initialIndex]) {
+        setSongName(songs[initialIndex].name);
+      }
+
       const loopPreference = localStorage.getItem('flowLoop');
       if (loopPreference !== null) {
         setIsLoopEnabled(loopPreference === 'true');
@@ -96,45 +81,46 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
         setPlayInSession(sessionPlayPreference === 'true');
       }
     } else {
-        // Handle case where songsData might initially be empty or not loaded as expected
         setCurrentSongIndex(0);
         setNextSongIndex(0);
-        setSongName("No songs available");
+        setSongName("No songs loaded (useEffect)");
     }
-  }, [songs.length]); // Depend on songs.length to re-run if songsData changes (e.g. during dev)
+  }, [songs]); // Re-run if songs array itself changes (e.g. on HMR if glob changes)
 
-  // Extract and format song name from path
+  // Update songName when currentSongIndex or songs list changes
   useEffect(() => {
+    console.log("MusicPlayer useEffect [currentSongIndex, songs]: songs.length =", songs.length, "currentSongIndex =", currentSongIndex);
     if (songs.length > 0 && songs[currentSongIndex]) {
-      // Use title and artist from the Song object
-      setSongName(`${songs[currentSongIndex].title} - ${songs[currentSongIndex].artist}`);
+      setSongName(songs[currentSongIndex].name);
       localStorage.setItem('lastSongIndex', currentSongIndex.toString());
     } else if (songs.length === 0) {
-      setSongName("No songs loaded");
+      setSongName("No songs loaded (useEffect name update)");
     }
   }, [currentSongIndex, songs]);
 
-  // Update current time for progress bar
+  // Update current time and duration from audio element
   useEffect(() => {
-    if (!currentAudioRef.current) return;
+    const audioEl = currentAudioRef.current;
+    if (!audioEl) return;
     
-    const updateTime = () => {
-      if (currentAudioRef.current) {
-        setCurrentTime(currentAudioRef.current.currentTime);
-        setDuration(currentAudioRef.current.duration || 0);
-        animationFrameRef.current = requestAnimationFrame(updateTime);
-      }
+    const updateAudioData = () => {
+      setCurrentTime(audioEl.currentTime);
+      setDuration(audioEl.duration || 0);
     };
-    
-    // Always monitor time to keep progress bar in sync
-    animationFrameRef.current = requestAnimationFrame(updateTime);
+
+    audioEl.addEventListener('loadedmetadata', updateAudioData);
+    audioEl.addEventListener('timeupdate', updateAudioData); // More frequent updates
+
+    // Initial update in case metadata is already loaded
+    if(audioEl.readyState >= audioEl.HAVE_METADATA) {
+        updateAudioData();
+    }
     
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      audioEl.removeEventListener('loadedmetadata', updateAudioData);
+      audioEl.removeEventListener('timeupdate', updateAudioData);
     };
-  }, []);
+  }, [currentSongIndex, songs]); // Re-run when song changes
 
   // Initialize audio context and analyzer for equalizer
   useEffect(() => {
@@ -350,29 +336,17 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
 
   // Control play/pause
   useEffect(() => {
-    if (songs.length === 0) return;
+    if (songs.length === 0 || !currentAudioRef.current) return;
     
     if (isPlaying) {
-      if (currentAudioRef.current) {
-        currentAudioRef.current.play().catch(error => {
-          console.error('Error playing audio:', error);
-          setIsPlaying(false);
-        });
-      }
+      currentAudioRef.current.play().catch(error => {
+        console.error('Error playing audio:', error);
+        setIsPlaying(false);
+      });
     } else {
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-      }
-      if (nextAudioRef.current) {
-        nextAudioRef.current.pause();
-      }
-      // Clear any ongoing fade
-      if (fadeIntervalRef.current) {
-        clearInterval(fadeIntervalRef.current);
-        fadeIntervalRef.current = null;
-        setIsCrossFading(false);
-      }
+      currentAudioRef.current.pause();
     }
+    // This effect should primarily react to isPlaying state or song change
   }, [isPlaying, currentSongIndex, songs]);
 
   // Handle session active changes for "Only play when session is ON" feature
@@ -560,47 +534,27 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
 
       {/* Song Name and Time */}
       <div className="mb-2">
-        {/* Log Before Mapping/Rendering Song Info */}
         {(() => {
-          console.log("MusicPlayer - Attempting to render songs. Count:", songs.length, "Current Song Name:", songName);
-          return null; // This IIFE is just for logging, doesn't render anything itself
+          console.log("MusicPlayer - Rendering songs. Count:", songs.length, "Current Song Name:", songName);
+          return null;
         })()}
         <div className="text-center truncate text-gray-700 dark:text-gray-300 mb-1">
-          {songs.length === 0 ? (
-            <p>No songs found.</p> 
-          ) : (
-            songName // Display the current songName state
-          )}
+          {songs.length === 0 ? <p>No songs found (render)</p> : songName}
         </div>
         
-        {/* Equalizer Canvas */}
         {isEqEnabled && (
           <div className="my-2 bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden">
-            <canvas
-              ref={canvasRef}
-              className="w-full h-20"
-              width={300}
-              height={80}
-            />
+            <canvas ref={canvasRef} className="w-full h-20" width={300} height={80} />
           </div>
         )}
         
-        {/* Time display */}
         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>{msToClock(currentTime * 1000)}</span>
           <span>{msToClock(duration * 1000)}</span>
         </div>
         
-        {/* Progress bar */}
-        <div 
-          ref={progressRef}
-          className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full mt-1 mb-3 cursor-pointer overflow-hidden"
-          onClick={handleProgressClick}
-        >
-          <div 
-            className="h-full bg-blue-500 dark:bg-blue-600 rounded-full transition-all duration-100"
-            style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-          />
+        <div ref={progressRef} className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full mt-1 mb-3 cursor-pointer overflow-hidden" onClick={handleProgressClick}>
+          <div className="h-full bg-blue-500 dark:bg-blue-600 rounded-full transition-all duration-100" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
         </div>
       </div>
 
@@ -646,26 +600,19 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
         </button>
       </div>
 
-      {/* Hidden audio elements for cross-fade */}
-      {songs.length > 0 && songs[currentSongIndex] && ( // Ensure songs[currentSongIndex] exists
+      {/* Hidden audio elements */}
+      {songs.length > 0 && songs[currentSongIndex] && (
         <>
           <audio
             ref={currentAudioRef}
-            src={songs[currentSongIndex].src} // Use .src from Song object
-            preload="auto"
+            src={songs[currentSongIndex].url} // Use .url
             onEnded={handleAudioEnded}
-            onLoadedMetadata={() => {
-              if (currentAudioRef.current) {
-                setDuration(currentAudioRef.current.duration);
-              }
-            }}
+            // onLoadedMetadata is handled by useEffect now
           />
-          {/* Ensure songs[nextSongIndex] exists before rendering nextAudio */}
           {songs.length > 1 && songs[nextSongIndex] && (
             <audio
               ref={nextAudioRef}
-              src={songs[nextSongIndex].src} // Use .src from Song object
-              preload="auto"
+              src={songs[nextSongIndex].url} // Use .url
             />
           )}
         </>
