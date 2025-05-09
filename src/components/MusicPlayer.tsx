@@ -16,7 +16,7 @@ interface Song {
 /** Returns an array of { name, url } for every mp3 in /public/sounds/music */
 function loadFocusTracks() {
   const files = import.meta.glob(
-    '/sounds/music/*.mp3', // Path relative to /public directory
+    '/public/sounds/music/*.mp3', // Path relative to project root, targeting files in public/sounds/music
     { eager: true, query: '?url', import: 'default' }
   );
   // console.log("MusicPlayer: Raw files from glob:", files); // For temporary debugging if needed
@@ -328,6 +328,39 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
     prevIsSessionActiveRef.current = isSessionActive;
   }, [isSessionActive, playInSession]);
 
+  // resume AudioContext after the very first user interaction
+  useEffect(() => {
+    const resume = () => {
+      // Check if AudioContext exists on window and if its state is suspended
+      if (window.AudioContext && audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch((err) => {console.error("Failed to resume AudioContext on interaction:", err)});
+      } else if (!audioContextRef.current && window.AudioContext) {
+        // If no context exists yet, create one. It might start in a suspended state.
+        // This scenario is less likely if EQ useEffect already creates it, but good for robustness.
+        audioContextRef.current = new AudioContext();
+        if (audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume().catch((err) => {console.error("Failed to resume newly created AudioContext on interaction:", err)});
+        }
+      }
+      // Clean up event listeners once resumed or attempted
+      window.removeEventListener('pointerdown', resume);
+      window.removeEventListener('keydown', resume);
+    };
+  
+    // Check initial state. If already running, no need to add listeners.
+    if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      // Already running, do nothing.
+    } else {
+      window.addEventListener('pointerdown', resume, { once: true });
+      window.addEventListener('keydown', resume, { once: true });
+    }
+  
+    return () => {
+      window.removeEventListener('pointerdown', resume);
+      window.removeEventListener('keydown', resume);
+    };
+  }, []); // Empty dependency array, so it runs once on mount
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mt-6">
       <div className="flex justify-between items-center mb-3">
@@ -357,7 +390,7 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
         <button onClick={handlePrevious} className={`w-10 h-10 flex items-center justify-center rounded-full ${songs.length > 1 ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'} transition-colors`} aria-label="Previous song" disabled={songs.length <= 1}>⏮️</button>
         <button 
           onClick={handlePlayPauseLogic}
-          className={`w-12 h-12 flex items-center justify-center rounded-full cursor-pointer ${songs.length > 0 ? (isPlaying ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-blue-500 text-white hover:bg-blue-600') : 'bg-gray-400 text-white cursor-not-allowed'} transition-colors`}
+          className={`w-12 h-12 flex items-center justify-center rounded-full cursor-pointer ${songs.length > 0 ? (isPlaying ? 'bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700' : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700') : 'bg-gray-400 text-white cursor-not-allowed'} transition-colors`}
           aria-label={isPlaying ? "Pause" : "Play"}
           disabled={songs.length === 0}
         >
