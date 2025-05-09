@@ -11,22 +11,24 @@ interface Song {
 }
 
 //------------------------------------------
-// 1️⃣ GLOB ALL TRACKS FROM /public/music
+// 1️⃣ GLOB ALL TRACKS FROM /public/sounds/music
 //------------------------------------------
-const musicFiles = import.meta.glob(
-  '/music/*.mp3',
-  { eager: true, as: "url" }
-);
-// console.log("MusicPlayer: Raw musicFiles from glob:", musicFiles); // Optional: Keep for one-time check if needed
+/** Returns an array of { name, url } for every mp3 in /public/sounds/music */
+function loadFocusTracks() {
+  const files = import.meta.glob(
+    '/sounds/music/*.mp3', // Path relative to /public directory
+    { eager: true, query: '?url', import: 'default' }
+  );
+  // console.log("MusicPlayer: Raw files from glob:", files); // For temporary debugging if needed
 
-// Glob returns e.g. { '/music/Space Walk.mp3': '/music/Space%20Walk.mp3' }
-const tracks: Song[] = Object.entries(musicFiles)
-  .map(([path, url]) => ({
-    url,
+  const loadedTracks = Object.entries(files).map(([path, url]) => ({
+    url: url as string,
     name: decodeURIComponent(path.split('/').pop()!.replace('.mp3', ''))
-  }))
-  .sort((a, b) => a.name.localeCompare(b.name));   // tidy order
-// console.log("MusicPlayer: Generated tracks:", tracks); // Optional: Keep for one-time check
+  })).sort((a, b) => a.name.localeCompare(b.name)); // alpha-sort
+  
+  // console.log(`MusicPlayer: Loaded ${loadedTracks.length} focus tracks.`); // For temporary debugging
+  return loadedTracks;
+}
 //------------------------------------------
 
 const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive = false }) => {
@@ -39,10 +41,9 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   
-  // 🔄 useState(tracks) instead of empty array
-  const [songs, setSongs] = useState<Song[]>(tracks);
+  const [songs, setSongs] = useState(() => loadFocusTracks());
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
-  const [nextSongIndex, setNextSongIndex] = useState(tracks.length > 1 ? 1 : 0);
+  const [nextSongIndex, setNextSongIndex] = useState(songs.length > 1 ? 1 : 0); // Initialize based on loaded songs
   const [isPlaying, setIsPlaying] = useState(false);
   const [songName, setSongName] = useState('');
   const [isCrossFading, setIsCrossFading] = useState(false);
@@ -55,12 +56,8 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
   const prevIsSessionActiveRef = useRef(isSessionActive);
   
   useEffect(() => {
-    // Log initial track count after component mounts and songs state is set
     if (songs.length > 0) {
-      console.log(`MusicPlayer: Loaded ${songs.length} focus tracks from /public/music.`);
-    }
-    // Effect for initializing from localStorage, etc.
-    if (songs.length > 0) {
+      console.log(`MusicPlayer: Loaded ${songs.length} focus tracks.`); // Acceptance criteria log
       const savedIndexStr = localStorage.getItem('lastSongIndex');
       let initialIndex = 0;
       if (savedIndexStr !== null) {
@@ -74,24 +71,15 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
       if (songs[initialIndex]) {
         setSongName(songs[initialIndex].name);
       }
-
       const loopPreference = localStorage.getItem('flowLoop');
-      if (loopPreference !== null) {
-        setIsLoopEnabled(loopPreference === 'true');
-      }
-      
+      if (loopPreference !== null) setIsLoopEnabled(loopPreference === 'true');
       const sessionPlayPreference = localStorage.getItem('playInSession');
-      if (sessionPlayPreference !== null) {
-        setPlayInSession(sessionPlayPreference === 'true');
-      }
+      if (sessionPlayPreference !== null) setPlayInSession(sessionPlayPreference === 'true');
     } else {
-        setCurrentSongIndex(0);
-        setNextSongIndex(0);
         setSongName("No songs loaded");
     }
-  }, [songs]); // Dependency on songs ensures this runs if trackList changes post-initialization (HMR etc)
+  }, [songs]);
 
-  // Update songName when currentSongIndex or songs list changes
   useEffect(() => {
     if (songs.length > 0 && songs[currentSongIndex]) {
       setSongName(songs[currentSongIndex].name);
@@ -101,132 +89,108 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
     }
   }, [currentSongIndex, songs]);
 
-  // Update current time and duration from audio element
   useEffect(() => {
     const audioEl = currentAudioRef.current;
     if (!audioEl) return;
-    
     const updateAudioData = () => {
       setCurrentTime(audioEl.currentTime);
       setDuration(audioEl.duration || 0);
     };
-
     audioEl.addEventListener('loadedmetadata', updateAudioData);
     audioEl.addEventListener('timeupdate', updateAudioData);
-
-    if(audioEl.readyState >= audioEl.HAVE_METADATA) {
-        updateAudioData();
-    }
-    
+    if(audioEl.readyState >= audioEl.HAVE_METADATA) updateAudioData();
     return () => {
       audioEl.removeEventListener('loadedmetadata', updateAudioData);
       audioEl.removeEventListener('timeupdate', updateAudioData);
     };
   }, [currentSongIndex, songs]);
 
-  // Initialize audio context and analyzer for equalizer
   useEffect(() => {
+    // EQ Logic - ensure AudioContext is resumed by user gesture if needed
+    const resumeAudioContext = async () => {
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        try {
+          await audioContextRef.current.resume();
+        } catch (e) { console.error('Failed to resume audio context:', e); }
+      }
+    };
+
     if (!audioContextRef.current) {
       try {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      } catch (e) {
-        console.error('Failed to create audio context:', e);
-        return;
-      }
-    } else if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume().catch(e => console.error('Failed to resume audio context:', e));
+        resumeAudioContext(); // attempt resume if created fresh
+      } catch (e) { console.error('Failed to create audio context:', e); return; }
+    } else {
+      resumeAudioContext(); // attempt resume if already exists
     }
 
     if (!isEqEnabled) {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      if (analyserRef.current && sourceNodeRef.current && audioContextRef.current) {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (analyserRef.current && sourceNodeRef.current && audioContextRef.current && sourceNodeRef.current.numberOfOutputs > 0) {
         try {
           sourceNodeRef.current.disconnect(analyserRef.current);
           analyserRef.current.disconnect(audioContextRef.current.destination);
-          // Reconnect source directly to destination if it was connected via analyser
           if(sourceNodeRef.current.mediaElement === currentAudioRef.current) {
              sourceNodeRef.current.connect(audioContextRef.current.destination);
           }
-        } catch (e) {
-          // console.error('Error during EQ disconnection:', e);
-        }
-        analyserRef.current = null; // Clear analyserRef after disconnecting
+        } catch (e) { /* console.error('Error during EQ old disconnect:', e); */ }
+      } else if (sourceNodeRef.current && sourceNodeRef.current.numberOfOutputs > 0 && sourceNodeRef.current.mediaElement === currentAudioRef.current) {
+        // If analyser was never connected, but source was to destination
+        try { sourceNodeRef.current.disconnect(audioContextRef.current.destination); } catch(e) {/*ignore*/}
+        try { sourceNodeRef.current.connect(audioContextRef.current.destination); } catch(e) {/*ignore*/}
       }
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
+      analyserRef.current = null;
+      const canvas = canvasRef.current; if (canvas) { const ctx = canvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);}
       return;
     }
-    
     if (!analyserRef.current && audioContextRef.current) {
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 256;
     }
-    
     if (currentAudioRef.current && audioContextRef.current && analyserRef.current) {
       try {
         if (!sourceNodeRef.current || sourceNodeRef.current.mediaElement !== currentAudioRef.current) {
-            if(sourceNodeRef.current) sourceNodeRef.current.disconnect(); // Disconnect old source if any
+            if(sourceNodeRef.current && sourceNodeRef.current.numberOfOutputs > 0) sourceNodeRef.current.disconnect();
             sourceNodeRef.current = audioContextRef.current.createMediaElementSource(currentAudioRef.current);
+        } else {
+             // Ensure source is disconnected before reconnecting to avoid multiple connections
+            if(sourceNodeRef.current.numberOfOutputs > 0) sourceNodeRef.current.disconnect();
         }
-        // Ensure connections are fresh
-        sourceNodeRef.current.disconnect(); // Disconnect from any previous connections
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
-      } catch (e) {
-        console.error('Failed to setup audio nodes for EQ:', e);
-        return;
-      }
+      } catch (e) { console.error('Failed to setup audio nodes for EQ:', e); return; }
     }
-    
-    const analyser = analyserRef.current;
-    const canvas = canvasRef.current;
-    if (!analyser || !canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    const barWidth = canvas.width / bufferLength * 2.5;
-    let x = 0;
+    const analyser = analyserRef.current; const canvas = canvasRef.current; if (!analyser || !canvas) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return; const bufferLength = analyser.frequencyBinCount; const dataArray = new Uint8Array(bufferLength);
+    const barWidth = canvas.width / bufferLength * 2.5; let x = 0;
     const renderFrame = () => {
       animationFrameRef.current = requestAnimationFrame(renderFrame);
-      x = 0;
-      analyser.getByteFrequencyData(dataArray);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (let i = 0; i < bufferLength; i++) {
-        const barHeight = (dataArray[i] / 255) * canvas.height;
-        const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
-        gradient.addColorStop(0, '#3B82F6');
-        gradient.addColorStop(0.5, '#60A5FA');
-        gradient.addColorStop(1, '#93C5FD');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-        x += barWidth + 1;
-      }
-    };
-    renderFrame();
-    return () => {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    };
-  }, [isEqEnabled, currentSongIndex, songs]); // Add currentSongIndex and songs to deps for EQ re-setup on song change
+      x = 0; analyser.getByteFrequencyData(dataArray); ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < bufferLength; i++) { const barHeight = (dataArray[i] / 255) * canvas.height; const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0); gradient.addColorStop(0, '#3B82F6'); gradient.addColorStop(0.5, '#60A5FA'); gradient.addColorStop(1, '#93C5FD'); ctx.fillStyle = gradient; ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight); x += barWidth + 1; }
+    }; renderFrame();
+    return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); };
+  }, [isEqEnabled, currentSongIndex, songs]);
 
-  // Control play/pause
+  const handlePlayPauseLogic = () => {
+    if (songs.length === 0) return;
+    // Autoplay fix: first user click for AudioContext and play
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().then(() => {
+        setIsPlaying(prevIsPlaying => !prevIsPlaying);
+      }).catch(e => console.error("AudioContext resume failed", e));
+      return; // Resume will trigger play via useEffect
+    }
+    setIsPlaying(prevIsPlaying => !prevIsPlaying);
+  };
+
   useEffect(() => {
     if (songs.length === 0 || !currentAudioRef.current) return;
     if (isPlaying) {
-      currentAudioRef.current.play().catch(error => {
-        console.error('Error playing audio:', error);
-        setIsPlaying(false);
-      });
+      currentAudioRef.current.play().catch(e => { console.error('Error playing audio:', e); setIsPlaying(false);});
     } else {
       currentAudioRef.current.pause();
     }
-  }, [isPlaying, currentSongIndex, songs]);
+  }, [isPlaying, currentSongIndex, songs]); // currentSongIndex, songs ensure play() is called on song change if isPlaying true
 
   const handleAudioEnded = () => {
     if (!isCrossFading && songs.length > 1) {
@@ -239,11 +203,6 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
     }
   };
 
-  const handlePlayPause = () => {
-    if (songs.length === 0) return;
-    setIsPlaying(!isPlaying);
-  };
-  
   const handleNext = () => {
     if (songs.length <= 1) return;
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
@@ -396,7 +355,14 @@ const MusicPlayer: React.FC<{ isSessionActive?: boolean }> = ({ isSessionActive 
 
       <div className="flex justify-center space-x-4">
         <button onClick={handlePrevious} className={`w-10 h-10 flex items-center justify-center rounded-full ${songs.length > 1 ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'} transition-colors`} aria-label="Previous song" disabled={songs.length <= 1}>⏮️</button>
-        <button onClick={handlePlayPause} className={`w-12 h-12 flex items-center justify-center rounded-full cursor-pointer ${songs.length > 0 ? (isPlaying ? 'bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700' : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700') : 'bg-gray-400 text-white cursor-not-allowed'} transition-colors`} aria-label={isPlaying ? "Pause" : "Play"} disabled={songs.length === 0}>{isPlaying ? "⏸️" : "▶️"}</button>
+        <button 
+          onClick={handlePlayPauseLogic}
+          className={`w-12 h-12 flex items-center justify-center rounded-full cursor-pointer ${songs.length > 0 ? (isPlaying ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-blue-500 text-white hover:bg-blue-600') : 'bg-gray-400 text-white cursor-not-allowed'} transition-colors`}
+          aria-label={isPlaying ? "Pause" : "Play"}
+          disabled={songs.length === 0}
+        >
+          {isPlaying ? "⏸️" : "▶️"}
+        </button>
         <button onClick={handleNext} className={`w-10 h-10 flex items-center justify-center rounded-full ${songs.length > 1 ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'} transition-colors`} aria-label="Next song" disabled={songs.length <= 1}>⏭️</button>
       </div>
 
