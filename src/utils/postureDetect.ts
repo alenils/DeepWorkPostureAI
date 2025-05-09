@@ -62,13 +62,14 @@ interface BaselineMetrics {
 // Update function signature to accept BaselineMetrics
 export function isGoodPosture(
   landmarks: NormalizedLandmark[],
-  baselineMetrics: BaselineMetrics | null | undefined // Changed type here
+  baselineMetrics: BaselineMetrics | null | undefined, // Changed type here
+  sensitivityPercentage: number = 10 // New: Default value if not passed
 ): { isGood: boolean; message: string } {
 
   // --- Reference App Thresholds (Reverted) ---
-  const Y_NOSE_THRESHOLD = 0.06; 
-  const X_NOSE_THRESHOLD = 0.06;
-  const Y_EAR_TILT_THRESHOLD = 0.03; 
+  // const Y_NOSE_THRESHOLD = 0.06; 
+  // const X_NOSE_THRESHOLD = 0.06;
+  // const Y_EAR_TILT_THRESHOLD = 0.03; 
   // EAR_SHOULDER_DIST_THRESHOLD is removed as lean check is commented out
   // ---
 
@@ -97,26 +98,41 @@ export function isGoodPosture(
     return { isGood: true, message: "Calibrate to begin." }; 
   }
 
-  // --- Perform Checks using Baseline Metrics --- 
+  // --- Perform Checks using Baseline Metrics & Dynamic Sensitivity --- 
+  const deviationFactor = sensitivityPercentage / 100;
 
-  // 1. Check Vertical Nose Difference vs Baseline Nose Y
-  const yDiff = Math.abs(nose.y - baselineMetrics.noseY);
-  if (yDiff > Y_NOSE_THRESHOLD) {
-    console.log(`POSTURE CHECK: Result -> BAD (Nose Y Diff: ${yDiff.toFixed(3)} > ${Y_NOSE_THRESHOLD})`);
+  // 1. Vertical Nose Difference
+  // Threshold is a percentage of the baseline nose's Y position itself
+  // (or a fixed small absolute value if noseY is very small/large to prevent extreme thresholds)
+  const yNoseThreshold = Math.max(0.01, baselineMetrics.noseY * deviationFactor); // Min 1% deviation of baseline noseY
+  const yDiffValue = nose.y - baselineMetrics.noseY; // Positive if dropped, negative if raised
+
+  if (yDiffValue > yNoseThreshold) {
+    console.log(`POSTURE CHECK: Result -> BAD (Nose Y Drop: ${yDiffValue.toFixed(3)} > ${yNoseThreshold.toFixed(3)}) Sensitivity: ${sensitivityPercentage}%`);
     return { isGood: false, message: "Vertical head position changed!" }; 
   }
+  if (yDiffValue < -yNoseThreshold) { // Check for head raised too much
+    console.log(`POSTURE CHECK: Result -> BAD (Nose Y Raised: ${Math.abs(yDiffValue).toFixed(3)} > ${yNoseThreshold.toFixed(3)}) Sensitivity: ${sensitivityPercentage}%`);
+    return { isGood: false, message: "Vertical head position too high!" }; 
+  }
 
-  // 2. Check Horizontal Nose Difference vs Baseline Nose X 
-  const xDiff = Math.abs(nose.x - baselineMetrics.noseX);
-  if (xDiff > X_NOSE_THRESHOLD) {
-    console.log(`POSTURE CHECK: Result -> BAD (Nose X Diff: ${xDiff.toFixed(3)} > ${X_NOSE_THRESHOLD})`);
+  // 2. Horizontal Nose Difference
+  // Threshold as a percentage of a reference width, e.g., 20% of video width is max deviation at 100% sensitivity
+  const xNoseReference = 0.2; // Assume 20% of video width is a large deviation reference
+  const xNoseThreshold = xNoseReference * deviationFactor;
+  const xDiffValue = Math.abs(nose.x - baselineMetrics.noseX);
+  if (xDiffValue > xNoseThreshold) {
+    console.log(`POSTURE CHECK: Result -> BAD (Nose X Diff: ${xDiffValue.toFixed(3)} > ${xNoseThreshold.toFixed(3)}) Sensitivity: ${sensitivityPercentage}%`);
     return { isGood: false, message: "Horizontal head position changed!" };
   }
 
-  // 3. Check Ear Tilt (Current Frame Only)
-  const earDiffY = Math.abs(leftEar.y - rightEar.y);
-  if (earDiffY > Y_EAR_TILT_THRESHOLD) {
-    console.log(`POSTURE CHECK: Result -> BAD (Ear Y Diff: ${earDiffY.toFixed(3)} > ${Y_EAR_TILT_THRESHOLD})`);
+  // 3. Ear Tilt (Vertical Difference between ears)
+  // Threshold as a percentage of a reference height, e.g., 10% of video height for max tilt at 100% sensitivity
+  const yEarTiltReference = 0.1; // Max allowed tilt is 10% of video height reference
+  const yEarTiltThreshold = yEarTiltReference * deviationFactor;
+  const earDiffYValue = Math.abs(leftEar.y - rightEar.y);
+  if (earDiffYValue > yEarTiltThreshold) {
+    console.log(`POSTURE CHECK: Result -> BAD (Ear Y Diff: ${earDiffYValue.toFixed(3)} > ${yEarTiltThreshold.toFixed(3)}) Sensitivity: ${sensitivityPercentage}%`);
     return { isGood: false, message: "Head tilted!" }; 
   }
       
@@ -135,7 +151,7 @@ export function isGoodPosture(
   */
 
   // If Nose X/Y and Ear Tilt checks pass
-  console.log("POSTURE CHECK: Result -> GOOD (Reference Logic - No Lean Check)");
+  console.log(`POSTURE CHECK: Result -> GOOD (Dynamic Thresholds) Sensitivity: ${sensitivityPercentage}%`);
   return { isGood: true, message: "Posture OK!" };
 }
 

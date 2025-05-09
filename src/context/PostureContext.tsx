@@ -38,6 +38,8 @@ interface PostureContextType {
   isCalibrating: boolean;
   isLoadingDetector: boolean;
   countdown: number | null;
+  sensitivityPercentage: number;
+  setSensitivityPercentage: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const PostureContext = createContext<PostureContextType | undefined>(undefined);
@@ -60,6 +62,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isCalibrating, setIsCalibrating] = useState(false); // State for calibration process
   const [isLoadingDetector, setIsLoadingDetector] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null); // State for countdown display
+  const [sensitivityPercentage, setSensitivityPercentage] = useState(10); // New: Default to 10%
   const intervalIdRef = useRef<number | null>(null);
   const detectingRef = useRef<boolean>(false);
   const calibrationTimerRef = useRef<number | null>(null); // Ref for calibration countdown timer
@@ -69,6 +72,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   const baselineMetricsRef = useRef(baselineMetrics);
   const detectedLandmarksRef = useRef(detectedLandmarks);
   const postureStatusRef = useRef(postureStatus);
+  const sensitivityPercentageRef = useRef(sensitivityPercentage); // New Ref
 
   // Effects to keep refs in sync with state
   useEffect(() => {
@@ -86,6 +90,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     postureStatusRef.current = postureStatus;
   }, [postureStatus]);
+
+  useEffect(() => { // New effect to sync sensitivityPercentageRef
+    sensitivityPercentageRef.current = sensitivityPercentage;
+  }, [sensitivityPercentage]);
 
   const handleCalibration = () => {
     if (calibrationTimerRef.current) { // Prevent starting if already calibrating
@@ -132,10 +140,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
               setBaselineMetrics(metrics); // Store calculated metrics
               setIsCalibrated(true); // Calibration complete
               setIsCalibrating(false);
-              // Check posture immediately with the new metrics
-              const status = isGoodPosture(landmarksAtCalibrationTime, metrics); 
+              // Check posture immediately with the new metrics and sensitivity
+              const status = isGoodPosture(landmarksAtCalibrationTime, metrics, sensitivityPercentageRef.current); 
               setPostureStatus(status);
-              console.log("CONTEXT: Calibration complete. isCalibrated=true. Metrics:", metrics, "Status:", status);
+              console.log("CONTEXT: Calibration complete. isCalibrated=true. Metrics:", metrics, "Status:", status, "Sensitivity:", sensitivityPercentageRef.current);
             } else {
               console.warn("CONTEXT: Could not calculate baseline metrics - missing required landmarks after delay.");
               setPostureStatus({ isGood: false, message: "Calibration failed: landmarks lost." });
@@ -161,6 +169,7 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
     (result: PoseLandmarkerResult, timestampMs: number) => {
       const currentIsCalibrated = isCalibratedRef.current;
       const currentBaselineMetrics = baselineMetricsRef.current;
+      const currentSensitivityPercentage = sensitivityPercentageRef.current; // Get current sensitivity
       const currentPostureStatusMessage = postureStatusRef.current.message;
 
       if (result.landmarks && result.landmarks.length > 0) {
@@ -168,10 +177,10 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         setDetectedLandmarks(newLandmarksFromDetector);
 
         if (currentIsCalibrated && currentBaselineMetrics) {
-          const status = isGoodPosture(newLandmarksFromDetector, currentBaselineMetrics);
+          const status = isGoodPosture(newLandmarksFromDetector, currentBaselineMetrics, currentSensitivityPercentage); // Pass sensitivity
           setPostureStatus(status);
         } else if (!isCalibrating) { // Only update if not in the middle of calibrating
-          const preCalibrationStatus = isGoodPosture(newLandmarksFromDetector, null);
+          const preCalibrationStatus = isGoodPosture(newLandmarksFromDetector, null, currentSensitivityPercentage); // Pass sensitivity
           const message = newLandmarksFromDetector.length > 0 ? "Ready to calibrate." : "Initializing detector...";
           setPostureStatus({ isGood: preCalibrationStatus.isGood, message: message });
         }
@@ -359,6 +368,8 @@ export const PostureProvider: React.FC<{ children: React.ReactNode }> = ({
         isCalibrating,
         isLoadingDetector,
         countdown,
+        sensitivityPercentage,
+        setSensitivityPercentage,
       }}
     >
       {children}
