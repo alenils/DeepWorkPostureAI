@@ -283,7 +283,6 @@ function App() {
   useEffect(() => {
     const savedMode = localStorage.getItem('warpMode') as WarpMode | null;
     if (savedMode && savedMode !== 'none') {
-      // Don't auto-start, just remember the last used mode
       setWarpMode(savedMode);
     }
     
@@ -295,14 +294,15 @@ function App() {
   
   // Handle speed change
   const handleWarpSpeedChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSpeed = parseFloat(e.target.value);
-    setWarpSpeed(newSpeed);
-    localStorage.setItem('warpSpeed', newSpeed.toString());
+    const sliderPosition = parseFloat(e.target.value); // sliderPosition is 0-100
+    const newActualSpeed = Math.max(1, Math.pow(1000, sliderPosition / 100));
     
-    // If warp is active, restart animation with new speed
+    setWarpSpeed(newActualSpeed);
+    localStorage.setItem('warpSpeed', newActualSpeed.toString());
+    
     if (warpMode !== 'none' && warpAnimationFrameIdRef.current) {
       cancelAnimationFrame(warpAnimationFrameIdRef.current);
-      animateWarpStars(newSpeed);
+      animateWarpStars(newActualSpeed);
     }
   }, [warpMode, animateWarpStars]);
 
@@ -727,11 +727,11 @@ function App() {
 
       {/* FULL WARP Controls */}
       {(warpMode === 'background' || warpMode === 'full') && (
-        <div id="warpControls" className="absolute bottom-4 right-4 z-[10000] flex gap-3 items-center opacity-40 hover:opacity-70 transition">
+        <div id="warpControls" className="absolute bottom-4 right-4 z-[10000] flex gap-3 items-center">
           <button
             id="warpDistract"
             onClick={handleWarpDistraction}
-            className="text-red-300 text-sm px-2 py-1 bg-black/30 backdrop-blur-sm rounded"
+            className="bg-red-700/80 hover:bg-red-600/100 text-white font-semibold text-xs px-3 py-1.5 rounded-md backdrop-blur-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900/50 opacity-60 hover:opacity-100"
             title="Log distraction"
           >
             DISTRACTED
@@ -739,7 +739,7 @@ function App() {
           <button
             id="exitWarp"
             onClick={handleExitWarp}
-            className="text-gray-100 text-sm px-2 py-1 bg-black/30 backdrop-blur-sm rounded"
+            className="bg-sky-700/80 hover:bg-sky-600/100 text-white font-semibold text-xs px-3 py-1.5 rounded-md backdrop-blur-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-gray-900/50 opacity-60 hover:opacity-100"
             title="Exit warp"
           >
             EXIT WARP
@@ -939,10 +939,10 @@ function App() {
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Star Speed</label>
                 <input 
                   type="range" 
-                  min="1" 
-                  max="1000" 
-                  step="10" 
-                  value={warpSpeed}
+                  min="0" 
+                  max="100" 
+                  step="1" 
+                  value={Math.max(0, Math.min(100, 100 * (Math.log(Math.max(1, warpSpeed)) / Math.log(1000))))}
                   onChange={handleWarpSpeedChange}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
                 />
