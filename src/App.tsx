@@ -244,17 +244,34 @@ function App() {
       
       // Only draw stars within canvas bounds
       if (starX >= 0 && starX <= canvas.width && starY >= 0 && starY <= canvas.height) {
-        // Calculate star size based on depth
-        const size = Math.max(0.5, (1 - star.z / MAX_DEPTH) * 2);
-        
-        // Calculate brightness based on depth
-        const opacity = Math.min(1, (1 - star.z / MAX_DEPTH) * 1.5);
-        
-        // Draw star
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-        ctx.arc(starX, starY, size, 0, Math.PI * 2);
-        ctx.fill();
+        if (speedMultiplier > 100) {
+          const warpFactor = (speedMultiplier - 100) / 900; // Normalize 0-1 for 100-1000x
+          const perspectiveFactor = Math.max(0, (MAX_DEPTH - star.z) / MAX_DEPTH); // Ensure non-negative
+          let lineLength = 5 + 150 * warpFactor * perspectiveFactor; 
+          lineLength = Math.max(1, lineLength); // Ensure minimum length
+
+          const angle = Math.atan2(star.y, star.x); // star.x, star.y are centered around 0
+
+          const endX = starX + Math.cos(angle) * lineLength;
+          const endY = starY + Math.sin(angle) * lineLength;
+          
+          ctx.beginPath();
+          ctx.moveTo(starX, starY);
+          ctx.lineTo(endX, endY);
+          // Brighter/more opaque and thicker lines at higher speeds/warpFactor
+          ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(1, 0.3 + warpFactor * 0.7 + perspectiveFactor * 0.2)})`;
+          ctx.lineWidth = (1 + warpFactor * 2.5) * (perspectiveFactor * 0.7 + 0.3);
+          ctx.stroke();
+        } else {
+          // Original dot drawing logic for lower speeds
+          const size = Math.max(0.5, (1 - star.z / MAX_DEPTH) * 2);
+          const opacity = Math.min(1, (1 - star.z / MAX_DEPTH) * 1.5);
+          
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+          ctx.arc(starX, starY, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     });
     
@@ -923,16 +940,16 @@ function App() {
                 <input 
                   type="range" 
                   min="1" 
-                  max="5" 
-                  step="0.1" 
+                  max="1000" 
+                  step="10" 
                   value={warpSpeed}
                   onChange={handleWarpSpeedChange}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
                 />
                 <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                   <span>1×</span>
-                  <span>{warpSpeed.toFixed(1)}×</span>
-                  <span>5×</span>
+                  <span>{warpSpeed.toFixed(0)}×</span>
+                  <span>1000×</span>
                 </div>
               </div>
             </div>

@@ -99,7 +99,12 @@ export function isGoodPosture(
   }
 
   // --- Perform Checks using Baseline Metrics & Dynamic Sensitivity --- 
-  const deviationFactor = sensitivityPercentage / 100;
+  // Original: const deviationFactor = sensitivityPercentage / 100;
+  // New logic: Slider value 5 (less sensitive) should mean a large deviation factor.
+  // Slider value 30 (more sensitive) should mean a small deviation factor.
+  // Range of sensitivityPercentage is 5-30.
+  const invertedSensitivity = (30 + 5) - sensitivityPercentage; // Max (30) becomes 5, Min (5) becomes 30.
+  const deviationFactor = invertedSensitivity / 100; // Now, higher UI sensitivity setting -> smaller deviation factor.
 
   // 1. Vertical Nose Difference
   // Threshold is a percentage of the baseline nose's Y position itself
