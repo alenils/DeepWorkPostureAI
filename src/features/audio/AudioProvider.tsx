@@ -29,38 +29,49 @@ interface AudioContextType {
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
-// --- SFX Loading ---
-const sfxFileModules = import.meta.glob(
-  '/sfx/*.mp3',
-  { eager: true, query: '?url', import: 'default' }
-) as Record<string, string>;
-
-const sfxMap = new Map<string, string>();
-Object.entries(sfxFileModules).forEach(([path, url]) => {
-  const filename = path.substring(path.lastIndexOf('/') + 1);
-  if (filename) {
-    sfxMap.set(filename, url);
-  }
-});
+// --- SFX Loading (Suggestion A.1, A.3 - Corrected path based on /public/sounds/sfx)
+const sfxFiles = import.meta.glob('/sounds/sfx/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
+const sfxMap = new Map<string, string>(
+  Object.entries(sfxFiles).map(([path, url]) => {
+    const filename = path.substring(path.lastIndexOf('/') + 1);
+    return [filename, url];
+  })
+);
 console.log("AudioProvider: SFX Map initialized:", sfxMap); // For debugging
 
-// --- Music Track Loading ---
-const album1Modules = import.meta.glob('/music/album1/*.mp3', {query:'?url',import:'default',eager:true}) as Record<string, string>;
-const album2Modules = import.meta.glob('/music/album2/*.mp3', {query:'?url',import:'default',eager:true}) as Record<string, string>;
-
-function parseTracks(modules: Record<string, string>, albumId: AlbumId): Song[] {
-  return Object.entries(modules).map(([path, url]) => ({
-    url,
-    name: decodeURIComponent(path.substring(path.lastIndexOf('/') + 1).replace('.mp3', '')),
-    album: albumId,
-  })).sort((a, b) => a.name.localeCompare(b.name));
-}
+// --- Music Track Loading (Suggestion A.1, A.2) ---
+const albumTracksGlob = import.meta.glob('/music/**/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
 
 const allLoadedTracks: Record<AlbumId, Song[]> = {
-  album1: parseTracks(album1Modules, 'album1'),
-  album2: parseTracks(album2Modules, 'album2'),
+  album1: [],
+  album2: [],
 };
+
+const trackListForProvider: Song[] = []; // Flat list for initial provider state if needed, or derive from allLoadedTracks
+
+Object.entries(albumTracksGlob).forEach(([path, url]) => {
+  const name = decodeURIComponent(path.substring(path.lastIndexOf('/') + 1).replace('.mp3', ''));
+  let album: AlbumId = 'album1'; // Default or derive from path
+  if (path.includes('/music/album1/')) {
+    album = 'album1';
+  } else if (path.includes('/music/album2/')) {
+    album = 'album2';
+  }
+  // Can add more sophisticated album detection if folder structure is deeper/different
+
+  const song: Song = { url, name, album };
+  allLoadedTracks[album].push(song);
+  trackListForProvider.push(song); // Add to the flat list
+});
+
+// Sort tracks within each album
+allLoadedTracks.album1.sort((a, b) => a.name.localeCompare(b.name));
+allLoadedTracks.album2.sort((a, b) => a.name.localeCompare(b.name));
+
 console.log("AudioProvider: All music tracks loaded:", allLoadedTracks);
+if (trackListForProvider.length === 0) {
+  console.warn("AudioProvider: trackListForProvider is empty. No music tracks were loaded. Check glob paths and /public/music folder structure.");
+}
 
 // --- Fisher-Yates Shuffle ---
 function shuffleArray<T>(array: T[]): T[] {
@@ -75,34 +86,47 @@ function shuffleArray<T>(array: T[]): T[] {
 export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [selectedAlbum, setSelectedAlbum] = useState<AlbumId>('album1');
   const [isShuffleActive, setIsShuffleActive] = useState(false);
+  // Initialize with tracks from the selected album, potentially shuffled (Suggestion B)
   const [currentTracklist, setCurrentTracklist] = useState<Song[]>(() => {
-    return isShuffleActive ? shuffleArray(allLoadedTracks[selectedAlbum]) : allLoadedTracks[selectedAlbum];
+    const initialAlbumTracks = allLoadedTracks[selectedAlbum] || [];
+    return isShuffleActive ? shuffleArray(initialAlbumTracks) : initialAlbumTracks;
   });
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   
   const audioElementRef = useRef<HTMLAudioElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null); // For AudioContext resume utility
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const currentTrack = currentTracklist[currentTrackIndex] || null;
 
-  // Initialize AudioContext and handle resume on first user interaction
+  // Initialize AudioContext and handle resume on first user interaction (Suggestion C)
   useEffect(() => {
     const resume = () => {
       if (!audioContextRef.current && window.AudioContext) {
-        audioContextRef.current = new window.AudioContext();
+        try {
+          audioContextRef.current = new window.AudioContext();
+        } catch (e) {
+          console.error("Failed to create AudioContext:", e);
+          return;
+        }
       }
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume().catch(console.error);
+        audioContextRef.current.resume().catch(e => console.error("AudioContext resume failed:", e));
       }
+      // Clean up listeners once resumed or attempt failed
       window.removeEventListener('pointerdown', resume);
       window.removeEventListener('keydown', resume);
     };
-    if (!(audioContextRef.current && audioContextRef.current.state === 'running')) {
-      window.addEventListener('pointerdown', resume);
-      window.addEventListener('keydown', resume);
+
+    // Only add listeners if context is not yet running
+    // This also handles the case where AudioContext might not be supported
+    if (window.AudioContext && (!audioContextRef.current || audioContextRef.current.state !== 'running')) {
+      window.addEventListener('pointerdown', resume, { once: true });
+      window.addEventListener('keydown', resume, { once: true });
     }
+
     return () => {
+      // Ensure listeners are cleaned up on component unmount if they haven't fired
       window.removeEventListener('pointerdown', resume);
       window.removeEventListener('keydown', resume);
     };
@@ -166,12 +190,13 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const playSfx = useCallback((sfxName: string) => {
     const url = sfxMap.get(sfxName);
     if (url) {
-      if (audioContextRef.current?.state === 'suspended') { // Ensure context is running for SFX too
+      // Ensure context is running for SFX too (Suggestion C part implied)
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
          audioContextRef.current.resume().catch(console.error);
       }
       const audio = new Audio(url);
       audio.volume = 0.4; // SFX Volume
-      audio.play().catch(e => console.warn(`SFX ${sfxName} play error:`, e));
+      audio.play().catch(e => console.warn(`SFX "${sfxName}" (url: ${url}) play error:`, e));
     } else {
       console.warn(`SFX "${sfxName}" not found. Available:`, Array.from(sfxMap.keys()));
     }

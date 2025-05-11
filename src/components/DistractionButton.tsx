@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSound } from '../hooks/useSound';
+import { useSound } from '../features/audio/useSound';
 
 interface DistractionButtonProps {
   isVisible: boolean;
