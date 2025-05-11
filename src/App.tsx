@@ -12,8 +12,8 @@ import { Notepad } from './components/Notepad'
 import { ActionsList } from './components/ActionsList'
 import { PostureView } from './components/PostureView'
 import { Toast } from './components/Toast'
-import { useSound } from './hooks/useSound'
-import { MusicPlayer } from './components/MusicPlayer'
+import { useSound } from './features/audio/useSound'
+import { MusicPlayer } from './features/audio/MusicPlayer'
 import { usePosture } from './context/PostureContext'
 
 // Unified history item types
