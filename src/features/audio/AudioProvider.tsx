@@ -75,8 +75,7 @@ Object.entries(albumTracksGlob).forEach(([path, url]) => {
   } else if (path.includes('/assets/music/album2/')) {
     album = 'album2';
   }
-  // Can add more sophisticated album detection if folder structure is deeper/different
-
+  console.log(`[AudioProvider] Processing track: ${path}, Detected album: ${album}`); // DEBUG LOG
   const song: Song = { url, name, album };
   allLoadedTracks[album].push(song);
   trackListForProvider.push(song); // Add to the flat list
@@ -206,6 +205,7 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [currentTrackIndex, currentTracklist.length, selectTrack]);
 
   const playSfx = useCallback((sfxName: string) => {
+    console.log('[AudioProvider playSfx] sfxMap size at call time:', sfxMap.size);
     const url = sfxMap.get(sfxName);
     if (url) {
       // Ensure context is running for SFX too (Suggestion C part implied)
