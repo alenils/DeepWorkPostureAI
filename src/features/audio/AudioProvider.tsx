@@ -16,6 +16,9 @@ console.log('[DEBUG] music keys', Object.keys(debugMusic));
 console.log('[DEBUG] sfx   keys', Object.keys(debugSfx));
 /* ====================== */
 
+// Define initialSfxMap at the module level as suggested
+const initialSfxMap: Map<string, string> = new Map();
+
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 
 // Types will be defined here (e.g., Song, Album)
@@ -47,15 +50,11 @@ interface AudioContextType {
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
-// --- SFX Loading (Suggestion A.1, A.3 - Corrected path based on /public/sounds/sfx)
+// --- SFX Loading (sfxFiles is still module-level and eagerly loaded)
 const sfxFiles = import.meta.glob('../../assets/sfx/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
-const sfxMap = new Map<string, string>(
-  Object.entries(sfxFiles).map(([path, url]) => {
-    const filename = path.substring(path.lastIndexOf('/') + 1);
-    return [filename, url];
-  })
-);
-console.log("AudioProvider: SFX Map initialized:", sfxMap); // For debugging
+// The module-level sfxMap initialization can be removed or kept for direct debugging, 
+// but the component will use sfxMapRef.current
+// console.log("AudioProvider: Module-level SFX Map initialized:", new Map(Object.entries(sfxFiles).map(([p, u]) => [p.split('/').pop()!, u as string])));
 
 // --- Music Track Loading (Suggestion A.1, A.2) ---
 const albumTracksGlob = import.meta.glob('../../assets/music/**/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
@@ -103,7 +102,6 @@ function shuffleArray<T>(array: T[]): T[] {
 export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [selectedAlbum, setSelectedAlbum] = useState<AlbumId>('album1');
   const [isShuffleActive, setIsShuffleActive] = useState(false);
-  // Initialize with tracks from the selected album, potentially shuffled (Suggestion B)
   const [currentTracklist, setCurrentTracklist] = useState<Song[]>(() => {
     const initialAlbumTracks = allLoadedTracks[selectedAlbum] || [];
     return isShuffleActive ? shuffleArray(initialAlbumTracks) : initialAlbumTracks;
@@ -113,6 +111,18 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const audioElementRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+
+  // SFX Map Ref as suggested
+  const sfxMapRef = useRef(initialSfxMap);
+
+  // Fill sfxMapRef.current exactly once
+  if (sfxMapRef.current.size === 0 && Object.keys(sfxFiles).length > 0) {
+    Object.entries(sfxFiles).forEach(([path, url]) => {
+      const file = path.split('/').pop()!;
+      sfxMapRef.current.set(file, url as string);
+    });
+    console.log('[AudioProvider] sfxMapRef.current populated:', sfxMapRef.current);
+  }
 
   const currentTrack = currentTracklist[currentTrackIndex] || null;
 
@@ -204,21 +214,23 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     selectTrack(newIndex);
   }, [currentTrackIndex, currentTracklist.length, selectTrack]);
 
-  const playSfx = useCallback((sfxName: string) => {
-    console.log('[AudioProvider playSfx] sfxMap size at call time:', sfxMap.size);
-    const url = sfxMap.get(sfxName);
-    if (url) {
-      // Ensure context is running for SFX too (Suggestion C part implied)
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-         audioContextRef.current.resume().catch(console.error);
-      }
-      const audio = new Audio(url);
-      audio.volume = 0.4; // SFX Volume
-      audio.play().catch(e => console.warn(`SFX "${sfxName}" (url: ${url}) play error:`, e));
-    } else {
-      console.warn(`SFX "${sfxName}" not found. Available:`, Array.from(sfxMap.keys()));
+  // New playSfx function as suggested
+  const playSfx: AudioContextType['playSfx'] = (name) => {
+    const map = sfxMapRef.current;
+    console.log('[AudioProvider playSfx] Attempting to play:', name, 'Available SFX in mapRef:', [...map.keys()]);
+    const url = map.get(name);
+    if (!url) {
+      console.warn(`[AudioProvider playSfx] SFX "${name}" missing from sfxMapRef.current. Map size: ${map.size}`);
+      return;
     }
-  }, []);
+    // Ensure AudioContext is running
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(err => console.error('[AudioProvider playSfx] AudioContext resume failed:', err));
+    }
+    const audio = new Audio(url);
+    audio.volume = 0.4; // SFX Volume
+    audio.play().catch(err => console.warn(`[AudioProvider playSfx] SFX "${name}" (url: ${url}) play error:`, err));
+  };
 
   const selectAlbumCallback = useCallback((albumId: AlbumId) => {
     if (isPlaying) {
