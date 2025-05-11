@@ -68,13 +68,19 @@ const trackListForProvider: Song[] = []; // Flat list for initial provider state
 
 Object.entries(albumTracksGlob).forEach(([path, url]) => {
   const name = decodeURIComponent(path.substring(path.lastIndexOf('/') + 1).replace('.mp3', ''));
-  let album: AlbumId = 'album1'; // Default or derive from path
-  if (path.includes('/assets/music/album1/')) {
-    album = 'album1';
-  } else if (path.includes('/assets/music/album2/')) {
+  
+  // Robust album detection using regex (Suggestion ❶)
+  const folderMatch = path.match(/music\/([^/]+)\//i); // Matches text between /music/ and the next slash
+  const folderName = folderMatch?.[1]?.toLowerCase();
+  
+  let album: AlbumId = 'album1'; // Default to album1
+  if (folderName === 'album2') {
     album = 'album2';
   }
-  console.log(`[AudioProvider] Processing track: ${path}, Detected album: ${album}`); // DEBUG LOG
+  // All other folder names (or if no match, e.g. files directly in /music/) will default to album1
+  // Or, you could add more specific checks if needed: else if (folderName === 'album1') album = 'album1';
+
+  console.log(`[AudioProvider] Processing track: ${path}, Raw Folder: ${folderMatch?.[1]}, Determined Album: ${album}`);
   const song: Song = { url, name, album };
   allLoadedTracks[album].push(song);
   trackListForProvider.push(song); // Add to the flat list
@@ -202,11 +208,61 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [isPlaying, currentTracklist]);
 
+  // Rewritten nextTrack function for shuffle and sequential playback (Suggestion ❷)
   const nextTrack = useCallback(() => {
-    if (currentTracklist.length === 0) return;
-    const newIndex = (currentTrackIndex + 1) % currentTracklist.length;
-    selectTrack(newIndex);
-  }, [currentTrackIndex, currentTracklist.length, selectTrack]);
+    if (!currentTrack || currentTracklist.length === 0) {
+      // If there's no current track or the list is empty, try to play the first track if available
+      if (currentTracklist.length > 0) {
+        selectTrack(0);
+      }
+      return;
+    }
+
+    let nextSong: Song | undefined;
+
+    if (isShuffleActive) {
+      // Filter out the current track by its URL to avoid playing it immediately again if possible
+      const remainingTracks = currentTracklist.filter(t => t.url !== currentTrack.url);
+      if (remainingTracks.length > 0) {
+        nextSong = remainingTracks[Math.floor(Math.random() * remainingTracks.length)];
+      } else if (currentTracklist.length > 0) {
+        // If current track was the only one, or all tracks are identical (e.g., list of 1),
+        // or remainingTracks is empty for any other reason, pick any random from the full list.
+        nextSong = currentTracklist[Math.floor(Math.random() * currentTracklist.length)];
+      }
+    } else {
+      const currentIndex = currentTracklist.findIndex(t => t.url === currentTrack.url);
+      if (currentIndex !== -1) { // Check if current track was found
+        const nextIndex = (currentIndex + 1) % currentTracklist.length;
+        nextSong = currentTracklist[nextIndex];
+      } else if (currentTracklist.length > 0) {
+        // Fallback if current track wasn't found in list (shouldn't happen often)
+        // Play the first track of the current list
+        nextSong = currentTracklist[0];
+        console.warn("[AudioProvider] nextTrack: Current track not found in tracklist, falling back to first track.");
+      }
+    }
+
+    if (nextSong) {
+      const nextSongIndex = currentTracklist.findIndex(t => t.url === nextSong!.url);
+      if (nextSongIndex !== -1) {
+        selectTrack(nextSongIndex); // selectTrack sets the currentTrackIndex
+      } else {
+        // This case should ideally not happen if nextSong comes from currentTracklist
+        console.warn("[AudioProvider] nextTrack: Could not find the determined next song in the tracklist. This is unexpected.");
+        if (currentTracklist.length > 0) selectTrack(0); // Fallback to first track of current list
+      }
+    } else if (currentTracklist.length > 0) {
+        // Fallback if no next song could be determined (e.g. empty list after filter and no fallback selected)
+        console.warn("[AudioProvider] nextTrack: No next song could be determined, playing first track of current list as fallback.");
+        selectTrack(0);
+    } else {
+      // If currentTracklist is empty and we somehow got here (e.g. it became empty after currentTrack was set)
+      console.warn("[AudioProvider] nextTrack: Tracklist is empty, cannot determine next track.");
+      // Optionally, set currentTrack to null or handle appropriately
+      // For now, do nothing, which might leave the player stopped with no track.
+    }
+  }, [currentTrack, currentTracklist, isShuffleActive, selectTrack]);
 
   const prevTrack = useCallback(() => {
     if (currentTracklist.length === 0) return;

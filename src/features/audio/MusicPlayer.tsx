@@ -32,7 +32,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({ isSessionActive = fals
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   // playInSession and loop controls could also be part of AudioProvider or remain local if purely UI preference
-  const [isLoopEnabled, setIsLoopEnabled] = useState(true); // Or get from context if made global
+  const [isLoopEnabled, setIsLoopEnabled] = useState(false); // Default loop to false for auto-advance
   const [playInSessionOnly, setPlayInSessionOnly] = useState(false);
   const prevIsSessionActiveRef = useRef(isSessionActive);
 
