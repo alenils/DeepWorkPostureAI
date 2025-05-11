@@ -1,3 +1,21 @@
+/* ===== DEBUG GLOB ===== */
+const debugMusic = import.meta.glob('/music/**/*.mp3', {
+  eager: true,
+  query: '?url',
+  import: 'default'
+});
+
+const debugSfx = import.meta.glob('/sounds/sfx/*.mp3', {
+  eager: true,
+  query: '?url',
+  import: 'default'
+});
+
+// Output the keys (just the paths — no URL noise)
+console.log('[DEBUG] music keys', Object.keys(debugMusic));
+console.log('[DEBUG] sfx   keys', Object.keys(debugSfx));
+/* ====================== */
+
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 
 // Types will be defined here (e.g., Song, Album)
