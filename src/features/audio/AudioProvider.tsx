@@ -1,11 +1,11 @@
 /* ===== DEBUG GLOB ===== */
-const debugMusic = import.meta.glob('/music/**/*.mp3', {
+const debugMusic = import.meta.glob('../../assets/music/**/*.mp3', {
   eager: true,
   query: '?url',
   import: 'default'
 });
 
-const debugSfx = import.meta.glob('/sounds/sfx/*.mp3', {
+const debugSfx = import.meta.glob('../../assets/sfx/*.mp3', {
   eager: true,
   query: '?url',
   import: 'default'
@@ -48,7 +48,7 @@ interface AudioContextType {
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 // --- SFX Loading (Suggestion A.1, A.3 - Corrected path based on /public/sounds/sfx)
-const sfxFiles = import.meta.glob('/sounds/sfx/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
+const sfxFiles = import.meta.glob('../../assets/sfx/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
 const sfxMap = new Map<string, string>(
   Object.entries(sfxFiles).map(([path, url]) => {
     const filename = path.substring(path.lastIndexOf('/') + 1);
@@ -58,7 +58,7 @@ const sfxMap = new Map<string, string>(
 console.log("AudioProvider: SFX Map initialized:", sfxMap); // For debugging
 
 // --- Music Track Loading (Suggestion A.1, A.2) ---
-const albumTracksGlob = import.meta.glob('/music/**/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
+const albumTracksGlob = import.meta.glob('../../assets/music/**/*.mp3', { eager:true, query:'?url', import:'default' }) as Record<string, string>;
 
 const allLoadedTracks: Record<AlbumId, Song[]> = {
   album1: [],
@@ -70,9 +70,9 @@ const trackListForProvider: Song[] = []; // Flat list for initial provider state
 Object.entries(albumTracksGlob).forEach(([path, url]) => {
   const name = decodeURIComponent(path.substring(path.lastIndexOf('/') + 1).replace('.mp3', ''));
   let album: AlbumId = 'album1'; // Default or derive from path
-  if (path.includes('/music/album1/')) {
+  if (path.includes('/assets/music/album1/')) {
     album = 'album1';
-  } else if (path.includes('/music/album2/')) {
+  } else if (path.includes('/assets/music/album2/')) {
     album = 'album2';
   }
   // Can add more sophisticated album detection if folder structure is deeper/different
