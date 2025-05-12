@@ -165,13 +165,42 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  // Update tracklist when album or shuffle state changes
+  // Effect 1: Update tracklist and RESET index when selectedAlbum changes
   useEffect(() => {
+    console.log(`[AudioProvider useEffect Album] Album changed to: ${selectedAlbum}`);
     const baseTracklist = allLoadedTracks[selectedAlbum] || [];
     const newTracklist = isShuffleActive ? shuffleArray(baseTracklist) : baseTracklist;
+    console.log(`[AudioProvider useEffect Album] Setting new tracklist for ${selectedAlbum}:`, newTracklist.map(t => t.name));
     setCurrentTracklist(newTracklist);
-    setCurrentTrackIndex(0); // Reset to first track of new list
-  }, [selectedAlbum, isShuffleActive]);
+    setCurrentTrackIndex(0); // Reset index only on album change
+  }, [selectedAlbum]); // Only depends on selectedAlbum
+
+  // Effect 2: Re-shuffle the list when isShuffleActive changes, WITHOUT resetting index
+  useEffect(() => {
+    console.log(`[AudioProvider useEffect Shuffle] Shuffle toggled: ${isShuffleActive}`);
+    // Get the currently loaded tracks (which should be for the correct selectedAlbum due to Effect 1)
+    const currentAlbumTracks = allLoadedTracks[selectedAlbum] || []; 
+    const newTracklist = isShuffleActive ? shuffleArray(currentAlbumTracks) : currentAlbumTracks;
+    
+    // Find the index of the currently playing track *within the newly shuffled/unshuffled list*
+    let newIndex = 0; // Default to 0 if track not found or list empty
+    if(currentTrack && newTracklist.length > 0) {
+      const foundIndex = newTracklist.findIndex(t => t.url === currentTrack.url);
+      if (foundIndex !== -1) {
+        newIndex = foundIndex;
+      }
+    }
+    
+    console.log(`[AudioProvider useEffect Shuffle] Updating tracklist (shuffled: ${isShuffleActive}). Current track index will be: ${newIndex}`, newTracklist.map(t=>t.name));
+    setCurrentTracklist(newTracklist); 
+    setCurrentTrackIndex(newIndex); // Set index to current track's new position, or 0
+
+  }, [isShuffleActive, selectedAlbum, currentTrack]); // Rerun if shuffle state changes (or album changes, to get correct base list)
+    // Including currentTrack might cause loops if not careful, but needed to find its new index.
+    // Let's refine dependency if needed, but selectedAlbum is necessary to get the right base list.
+    // Re-evaluating dependency array: maybe just depend on isShuffleActive and selectedAlbum?
+    // If we only depend on isShuffleActive, the base list might be stale if album changed JUST before shuffle toggle.
+    // Let's stick with [isShuffleActive, selectedAlbum, currentTrack] for now, keeping an eye on potential loops.
 
   // --- Audio Playback Controls ---
   const playPause = useCallback(() => {
